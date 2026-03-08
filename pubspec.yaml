@@ -1,0 +1,52 @@
+name: heatbubble
+description: Real pocket temperature tracker using device sensors.
+version: 1.0.0+1
+publish_to: 'none'
+
+environment:
+  sdk: ^3.11.1
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # Background polling
+  workmanager: ^0.9.0+3
+
+  # Local database
+  isar: ^3.1.0+1
+  isar_flutter_libs: ^3.1.0+1
+  path_provider: ^2.1.1
+
+  # Charts
+  fl_chart: ^0.70.2
+
+  # Notifications
+  flutter_local_notifications: ^18.0.1
+
+  # Permissions
+  permission_handler: ^11.3.1
+
+  # Utilities
+  intl: ^0.19.0
+
+  # Google Fonts
+  google_fonts: ^6.2.1
+
+  # Lucide Icons
+  lucide_icons_flutter: ^3.1.10
+
+  # First-launch persistence
+  shared_preferences: ^2.3.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  isar_generator: ^3.1.0+1
+  build_runner: ^2.4.8
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
