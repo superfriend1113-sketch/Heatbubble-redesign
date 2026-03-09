@@ -1,11 +1,11 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
-import 'screens/activity_screen.dart';
-import 'screens/notifications_screen.dart';
-import 'screens/profile_screen.dart';
+import 'screens/history_screen.dart';
+import 'screens/ai_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/get_started_screen.dart';
 
@@ -14,25 +14,22 @@ class HeatBubbleApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Resolve Inter's actual fontFamily name for global use
     final interFamily = GoogleFonts.inter().fontFamily!;
 
     return MaterialApp(
-      title: 'Heat Bubble',
+      title: 'HeatBubble',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0A0A0F),
-        colorScheme: const ColorScheme.dark(
+        brightness: Brightness.light,
+        scaffoldBackgroundColor: Colors.transparent,
+        colorScheme: const ColorScheme.light(
           primary: Color(0xFFFF6B35),
           secondary: Color(0xFF4FC3F7),
-          surface: Color(0xFF0A0A0F),
-          onSurface: Colors.white,
+          surface: Colors.transparent,
+          onSurface: Color(0xFF111827),
         ),
-        // Set Inter as default font for ALL text (including const TextStyle)
         fontFamily: interFamily,
-        // Also apply to the named textTheme styles
-        textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
+        textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme),
         useMaterial3: true,
       ),
       home: const _SplashRouter(),
@@ -51,9 +48,8 @@ class _SplashRouter extends StatelessWidget {
           .then((p) => p.getBool('onboarded') ?? false),
       builder: (context, snap) {
         if (!snap.hasData) {
-          // Show a plain dark screen while prefs load (no flash)
           return const Scaffold(
-            backgroundColor: Color(0xFF0A0A0F),
+            backgroundColor: Color(0xFFFF8E53),
             body: SizedBox.shrink(),
           );
         }
@@ -62,7 +58,6 @@ class _SplashRouter extends StatelessWidget {
     );
   }
 }
-
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -76,9 +71,8 @@ class _AppShellState extends State<AppShell> {
 
   static const _screens = [
     HomeScreen(),
-    ActivityScreen(),
-    NotificationsScreen(),
-    ProfileScreen(),
+    HistoryScreen(),
+    AiScreen(),
     SettingsScreen(),
   ];
 
@@ -86,75 +80,108 @@ class _AppShellState extends State<AppShell> {
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      bottomNavigationBar: Container(
-        // Fixed height: icon(24) + gap(5) + label(13) + top(12) + bottom(10) + safeArea
-        height: 64 + bottomPadding,
-        decoration: BoxDecoration(
-          color: const Color(0xFF080810),
-          border: const Border(
-            top: BorderSide(color: Color(0xFF1E1E2E), width: 0.8),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withAlpha(120),
-              blurRadius: 16,
-              offset: const Offset(0, -4),
-            ),
+    return Container(
+      // ── Warm gradient background matching Figma ──
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFFF6B6B), // coral red
+            Color(0xFFFF8E53), // warm orange
+            Color(0xFFFFB366), // golden peach
+            Color(0xFFD4A8C8), // soft mauve
+            Color(0xFFB8A9D4), // lavender
+            Color(0xFF8BA4D0), // periwinkle blue
           ],
+          stops: [0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
         ),
-        child: Padding(
-          padding: EdgeInsets.only(
-            left: 0,
-            right: 0,
-            top: 10,
-            bottom: bottomPadding + 8,
+      ),
+      child: Stack(
+        children: [
+          // ── Human silhouette (subtle, centered) ──
+          Positioned.fill(
+            child: Center(
+              child: Opacity(
+                opacity: 0.08,
+                child: Icon(
+                  Icons.accessibility_new_rounded,
+                  size: MediaQuery.of(context).size.height * 0.5,
+                  color: const Color(0xFF111827),
+                ),
+              ),
+            ),
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              _NavItem(
-                icon: LucideIcons.house,
-                label: 'Home',
-                isActive: _currentIndex == 0,
-                onTap: () => setState(() => _currentIndex = 0),
-              ),
-              _NavItem(
-                icon: LucideIcons.activity,
-                label: 'Activity',
-                isActive: _currentIndex == 1,
-                onTap: () => setState(() => _currentIndex = 1),
-              ),
-              _NavItem(
-                icon: LucideIcons.bell,
-                label: 'Alerts',
-                isActive: _currentIndex == 2,
-                onTap: () => setState(() => _currentIndex = 2),
-              ),
-              _NavItem(
-                icon: LucideIcons.user,
-                label: 'Profile',
-                isActive: _currentIndex == 3,
-                onTap: () => setState(() => _currentIndex = 3),
-              ),
-              _NavItem(
-                icon: LucideIcons.settings,
-                label: 'Settings',
-                isActive: _currentIndex == 4,
-                onTap: () => setState(() => _currentIndex = 4),
-              ),
-            ],
+          // ── Scaffold: body is a Column (screen + nav bar) ──
+          Scaffold(
+            backgroundColor: Colors.transparent,
+            body: Column(
+              children: [
+                // ── All screen content fills the remaining space ──
+                Expanded(
+                  child: IndexedStack(
+                    index: _currentIndex,
+                    children: _screens,
+                  ),
+                ),
+                // ── Nav bar: glassmorphic frosted surface ──
+                ClipRect(
+                  child: BackdropFilter(
+                    filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white.withAlpha(55),
+                        border: const Border(
+                          top: BorderSide(color: Color(0x33FFFFFF), width: 0.8),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          top: 8,
+                          bottom: bottomPadding + 6,
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            _NavItem(
+                              icon: LucideIcons.house,
+                              label: 'Home',
+                              isActive: _currentIndex == 0,
+                              onTap: () => setState(() => _currentIndex = 0),
+                            ),
+                            _NavItem(
+                              icon: LucideIcons.chartNoAxesCombined,
+                              label: 'History',
+                              isActive: _currentIndex == 1,
+                              onTap: () => setState(() => _currentIndex = 1),
+                            ),
+                            _NavItem(
+                              icon: LucideIcons.brain,
+                              label: 'AI',
+                              isActive: _currentIndex == 2,
+                              onTap: () => setState(() => _currentIndex = 2),
+                            ),
+                            _NavItem(
+                              icon: LucideIcons.settings,
+                              label: 'Settings',
+                              isActive: _currentIndex == 3,
+                              onTap: () => setState(() => _currentIndex = 3),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }
 }
+
 
 class _NavItem extends StatelessWidget {
   final IconData icon;
@@ -171,10 +198,6 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const activeColor = Color(0xFFFF6B35);
-    const inactiveColor = Color(0xFF6B7280);
-    final color = isActive ? activeColor : inactiveColor;
-
     return Expanded(
       child: GestureDetector(
         onTap: onTap,
@@ -183,17 +206,29 @@ class _NavItem extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Icon
-            Icon(icon, color: color, size: 24),
-            const SizedBox(height: 5),
-            // Label
+            // ── Active: dark rounded square around icon only ──
+            // ── Inactive: no background ──
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+              decoration: BoxDecoration(
+                color: isActive ? const Color(0xFF111827) : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: isActive ? Colors.white : const Color(0xFF6B7280),
+                size: 22,
+              ),
+            ),
+            const SizedBox(height: 3),
+            // Label always below the icon/pill
             Text(
               label,
               style: TextStyle(
-                color: color,
-                fontSize: 10,
+                color: isActive ? const Color(0xFF111827) : const Color(0xFF6B7280),
+                fontSize: 11,
                 fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                letterSpacing: 0.2,
                 height: 1.0,
               ),
             ),
