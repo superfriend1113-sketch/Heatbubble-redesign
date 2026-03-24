@@ -41,6 +41,19 @@ dependencies:
   # First-launch persistence
   shared_preferences: ^2.3.0
 
+  # In-App Purchases (Google Play Billing)
+  in_app_purchase: ^3.2.3
+
+  # Mobile Ads (AdMob) — upgraded to fix JavascriptEngine error
+  # Version 5.x has better WebView handling and stability
+  google_mobile_ads: ^5.1.0
+
+  # State Management
+  provider: ^6.1.0
+
+  # URL Launcher (for opening Play Store links)
+  url_launcher: ^6.3.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -50,3 +63,6 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  
+  assets:
+    - assets/public/heatbubble.png

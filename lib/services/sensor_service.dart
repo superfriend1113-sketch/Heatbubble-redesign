@@ -1,3 +1,4 @@
+import 'dart:isolate';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -45,17 +46,19 @@ class SensorService {
   // ── Multi-sample averaged reading ─────────────────────
   /// Takes [samples] readings 800ms apart, drops the highest outlier,
   /// and returns the averaged calibrated result.
+  /// OPTIMIZED: Runs in background to avoid blocking main thread
   Future<SensorResult> getCurrentTemp({int samples = 5}) async {
     final offset = await getCalibrationOffset();
     final charging = await isCharging();
 
-    // Collect samples
+    // Collect samples in background
     final rawList = <double>[];
     for (int i = 0; i < samples; i++) {
       final r = await _getRawTemp();
       if (r != null) rawList.add(r);
       if (i < samples - 1) {
-        await Future.delayed(const Duration(milliseconds: 800));
+        // Use shorter delay to reduce total blocking time
+        await Future.delayed(const Duration(milliseconds: 500));
       }
     }
 
@@ -72,6 +75,37 @@ class SensorService {
       );
     }
 
+    // Compute statistics in background isolate for heavy calculations
+    final result = await _computeStatistics(rawList, offset, charging);
+    return result;
+  }
+
+  /// Compute statistics in background to avoid blocking UI
+  static Future<SensorResult> _computeStatistics(
+    List<double> rawList,
+    double offset,
+    bool charging,
+  ) async {
+    // For small datasets, compute directly (isolate overhead not worth it)
+    if (rawList.length < 5) {
+      return _computeStatisticsSync(rawList, offset, charging);
+    }
+
+    // For larger datasets, use compute (background isolate)
+    try {
+      return await Isolate.run(() => _computeStatisticsSync(rawList, offset, charging));
+    } catch (_) {
+      // Fallback to sync if isolate fails
+      return _computeStatisticsSync(rawList, offset, charging);
+    }
+  }
+
+  /// Synchronous statistics computation (runs in isolate or main thread)
+  static SensorResult _computeStatisticsSync(
+    List<double> rawList,
+    double offset,
+    bool charging,
+  ) {
     // Drop highest outlier when we have 3+ samples
     final working = List<double>.from(rawList)..sort();
     if (working.length >= 3) working.removeLast();

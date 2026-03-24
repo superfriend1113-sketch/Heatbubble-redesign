@@ -59,13 +59,20 @@ class GetStartedScreen extends StatelessWidget {
                   height: logoSize,
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(logoSize * 0.26),
-                    color: Colors.white.withAlpha(90),
-                    border: Border.all(color: Colors.white.withAlpha(120), width: 1.5),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withAlpha(25),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                  child: Icon(
-                    Icons.thermostat_rounded,
-                    color: const Color(0xFF111827),
-                    size: logoSize * 0.45,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(logoSize * 0.26),
+                    child: Image.asset(
+                      'assets/public/heatbubble.png',
+                      fit: BoxFit.cover,
+                    ),
                   ),
                 ),
               ),

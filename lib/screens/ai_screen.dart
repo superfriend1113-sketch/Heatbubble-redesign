@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/storage_service.dart';
+import '../services/alert_store.dart';
 
 class AiScreen extends StatefulWidget {
   const AiScreen({super.key});
@@ -14,7 +15,7 @@ class _AiScreenState extends State<AiScreen> {
   bool _loading = true;
   String _trendLabel = 'Stable Trend';
   String _trendDescription = '';
-  final List<_InsightItem> _insights = [];
+  List<AlertRecord> _alerts = [];
 
   @override
   void initState() {
@@ -24,19 +25,17 @@ class _AiScreenState extends State<AiScreen> {
 
   Future<void> _loadData() async {
     final readings = await _storage.getLast7Days();
-    final latest = await _storage.getLatest();
-    final current = latest?.temperature ?? 0;
 
-    // Build trend
+    // ── Current Analysis: computed from sensor readings ──
     String trend = 'Stable Trend';
     String desc = 'Your temperature is stable and within normal range. Great job maintaining consistency!';
 
     if (readings.length >= 2) {
       final recent = readings.take(5).map((r) => r.temperature).toList();
-      final older = readings.skip(5).take(5).map((r) => r.temperature).toList();
+      final older  = readings.skip(5).take(5).map((r) => r.temperature).toList();
       if (recent.isNotEmpty && older.isNotEmpty) {
         final recentAvg = recent.reduce((a, b) => a + b) / recent.length;
-        final olderAvg = older.reduce((a, b) => a + b) / older.length;
+        final olderAvg  = older.reduce((a, b) => a + b) / older.length;
         final diff = recentAvg - olderAvg;
         if (diff > 0.3) {
           trend = 'Rising Trend';
@@ -48,57 +47,19 @@ class _AiScreenState extends State<AiScreen> {
       }
     }
 
-    // Build insights
-    final insights = <_InsightItem>[];
-    if (readings.length >= 2) {
-      for (int i = 0; i < readings.length - 1 && insights.length < 6; i++) {
-        final curr = readings[i];
-        final prev = readings[i + 1];
-        final diff = curr.temperature - prev.temperature;
-        if (diff.abs() > 0.2) {
-          final timeAgo = _formatTimeAgo(curr.timestamp);
-          if (diff > 0.2) {
-            insights.add(_InsightItem(
-              type: _InsightType.alert,
-              text: '🌡 Temperature rising detected! Your body temperature has increased ${diff.toStringAsFixed(1)}°C in the last reading. Stay hydrated and take a break if needed.',
-              timeAgo: timeAgo,
-            ));
-          } else {
-            insights.add(_InsightItem(
-              type: _InsightType.info,
-              text: '📉 Temperature decreasing trend observed. You\'ve cooled down ${diff.abs().toStringAsFixed(1)}°C recently. This could be normal after activity or being in a cooler space.',
-              timeAgo: timeAgo,
-            ));
-          }
-        }
-      }
-    }
-
-    // Always add stable insight
-    insights.insert(0, _InsightItem(
-      type: _InsightType.success,
-      text: '✅ Your temperature is stable and within normal range. Keep up the healthy habits!',
-      timeAgo: _formatTimeAgo(DateTime.now()),
-    ));
+    // ── Recent Insights: real fired notifications ──
+    final alerts = await AlertStore.load();
 
     if (mounted) {
       setState(() {
         _trendLabel = trend;
         _trendDescription = desc;
-        _insights.clear();
-        _insights.addAll(insights.take(5).toList());
+        _alerts = alerts;
         _loading = false;
       });
     }
   }
 
-  String _formatTimeAgo(DateTime dt) {
-    final ago = DateTime.now().difference(dt);
-    if (ago.inMinutes < 1) return 'less than a minute ago';
-    if (ago.inMinutes < 60) return '${ago.inMinutes} minutes ago';
-    if (ago.inHours < 24) return '${ago.inHours} hours ago';
-    return '${ago.inDays} days ago';
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -238,7 +199,7 @@ class _AiScreenState extends State<AiScreen> {
                 ),
                 const SizedBox(height: 20),
 
-                // ── Recent Insights — wrapped in glass card like Current Analysis ──
+                // ── Recent Insights — real fired notifications ──
                 _glassCard(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -253,7 +214,10 @@ class _AiScreenState extends State<AiScreen> {
                         ),
                       ),
                       const SizedBox(height: 14),
-                      ..._insights.map((insight) => _buildInsightCard(insight)),
+                      if (_alerts.isEmpty)
+                        _emptyAlerts()
+                      else
+                        ..._alerts.take(6).map((a) => _buildAlertCard(a)),
                     ],
                   ),
                 ),
@@ -275,29 +239,68 @@ class _AiScreenState extends State<AiScreen> {
     return Icons.check_circle;
   }
 
-  Widget _buildInsightCard(_InsightItem insight) {
-    final Color iconColor;
-    final IconData iconData;
-    switch (insight.type) {
-      case _InsightType.alert:
-        iconColor = const Color(0xFFEF4444);
-        iconData = Icons.warning_amber_rounded;
-        break;
-      case _InsightType.info:
-        iconColor = const Color(0xFF3B82F6);
-        iconData = Icons.info_outline_rounded;
-        break;
-      case _InsightType.success:
-        iconColor = const Color(0xFF10B981);
-        iconData = Icons.check_circle;
-        break;
+  // ── Alert type → icon / colour ─────────────────────
+  Color _alertColor(AlertType type) {
+    switch (type) {
+      case AlertType.extremeCold: return const Color(0xFF3B82F6);  // blue
+      case AlertType.extremeHeat: return const Color(0xFFEF4444);  // red
+      case AlertType.risingTrend: return const Color(0xFFF59E0B);  // amber
+      case AlertType.fallingTrend: return const Color(0xFF3B82F6); // blue
+      case AlertType.stable:      return const Color(0xFF10B981);  // green
     }
+  }
+
+  IconData _alertIcon(AlertType type) {
+    switch (type) {
+      case AlertType.extremeCold:  return Icons.ac_unit_rounded;
+      case AlertType.extremeHeat:  return Icons.local_fire_department_rounded;
+      case AlertType.risingTrend:  return Icons.trending_up_rounded;
+      case AlertType.fallingTrend: return Icons.trending_down_rounded;
+      case AlertType.stable:       return Icons.check_circle;
+    }
+  }
+
+  Widget _emptyAlerts() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 20),
+      child: const Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle_outline, color: Color(0xFF10B981), size: 36),
+            SizedBox(height: 10),
+            Text(
+              'No alerts fired yet',
+              style: TextStyle(
+                color: Color(0xFF6B7280),
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              'Alerts appear here when extreme\ntemperatures are detected.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Color(0xFF9CA3AF),
+                fontSize: 12,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAlertCard(AlertRecord alert) {
+    final color = _alertColor(alert.type);
+    final icon  = _alertIcon(alert.type);
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withAlpha(210),   // near-solid white
+        color: Colors.white.withAlpha(210),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white.withAlpha(230), width: 1),
         boxShadow: [
@@ -311,25 +314,23 @@ class _AiScreenState extends State<AiScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ── Coloured circle icon badge ──
+          // Coloured circle badge
           Container(
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: iconColor.withAlpha(25),
+              color: color.withAlpha(25),
               shape: BoxShape.circle,
             ),
-            child: Icon(iconData, size: 18, color: iconColor),
+            child: Icon(icon, size: 18, color: color),
           ),
           const SizedBox(width: 12),
-
-          // ── Text + timestamp ──
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  insight.text,
+                  alert.message,
                   style: const TextStyle(
                     color: Color(0xFF111827),
                     fontSize: 13,
@@ -347,11 +348,10 @@ class _AiScreenState extends State<AiScreen> {
                     ),
                     const SizedBox(width: 5),
                     Text(
-                      insight.timeAgo,
+                      alert.timeAgo,
                       style: TextStyle(
                         color: const Color(0xFF111827).withAlpha(130),
                         fontSize: 12,
-                        fontWeight: FontWeight.w400,
                       ),
                     ),
                   ],
@@ -384,16 +384,4 @@ class _AiScreenState extends State<AiScreen> {
   }
 }
 
-enum _InsightType { alert, info, success }
 
-class _InsightItem {
-  final _InsightType type;
-  final String text;
-  final String timeAgo;
-
-  const _InsightItem({
-    required this.type,
-    required this.text,
-    required this.timeAgo,
-  });
-}

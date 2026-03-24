@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/unit_service.dart';
+import '../services/subscription_service.dart';
+import '../screens/paywall_screen.dart';
+import '../screens/custom_alerts_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -12,6 +15,13 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _autoDetectSensors = true;
   bool _batteryFallback = true;
+  final _subscription = SubscriptionService();
+
+  @override
+  void initState() {
+    super.initState();
+    _subscription.init();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -52,6 +62,150 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             const SizedBox(height: 24),
+
+            // ── Subscription Status ──
+            _glassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(LucideIcons.crown, size: 18, color: Color(0xFFFF6B35)),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Subscription',
+                        style: TextStyle(
+                          color: Color(0xFF111827),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _subscription.isPremium
+                          ? const Color(0xFFFF6B35).withAlpha(30)
+                          : Colors.grey[300],
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _subscription.isPremium ? 'Premium Active' : 'Free Tier',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.bold,
+                                color: _subscription.isPremium
+                                    ? const Color(0xFFFF6B35)
+                                    : Colors.grey[700],
+                              ),
+                            ),
+                            if (_subscription.isPremium)
+                              FutureBuilder<String?>(
+                                future: _subscription.getPurchaseDate(),
+                                builder: (context, snap) {
+                                  return Text(
+                                    snap.data ?? 'Lifetime access',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.grey[600],
+                                    ),
+                                  );
+                                },
+                              ),
+                          ],
+                        ),
+                        if (!_subscription.isPremium)
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFF6B35),
+                            ),
+                            onPressed: () {
+                              showModalBottomSheet(
+                                context: context,
+                                isScrollControlled: true,
+                                builder: (context) => const PaywallScreen(),
+                              );
+                            },
+                            child: const Text('Upgrade'),
+                          ),
+                      ],
+                    ),
+                  ),
+                  if (_subscription.isPremium) ...[
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => _subscription.restorePurchases(),
+                        child: const Text('Restore Purchases'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Custom Alerts (Premium Feature) ──
+            if (_subscription.isPremium)
+              _glassCard(
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const CustomAlertsScreen(),
+                      ),
+                    );
+                  },
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: const [
+                              Icon(LucideIcons.bell, size: 18, color: Color(0xFFFF6B35)),
+                              SizedBox(width: 8),
+                              Text(
+                                'Custom Alerts',
+                                style: TextStyle(
+                                  color: Color(0xFF111827),
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const Icon(
+                            LucideIcons.chevronRight,
+                            size: 18,
+                            color: Color(0xFF111827),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Create and manage temperature alerts',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            if (_subscription.isPremium) const SizedBox(height: 20),
 
             // ── Temperature Unit ──
             _glassCard(
@@ -361,3 +515,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
+
