@@ -12,6 +12,7 @@ import '../services/comparison_service.dart';
 import '../services/subscription_service.dart';
 import '../services/ads_service.dart';
 import '../services/reading_counter_service.dart';
+import '../services/smart_sync_service.dart';
 import '../models/temp_reading.dart';
 import '../widgets/premium_widgets.dart';
 import '../widgets/hourly_chart_widget.dart';
@@ -34,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _subscription = SubscriptionService();
   final _ads = AdsService();
   final _readingCounter = ReadingCounterService();
+  final _smartSync = SmartSyncService();
 
   double _currentTemp = 0;
   double _avgTemp = 0;
@@ -41,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isStable = true;
   bool _showAiBanner = true;
   Timer? _pollTimer;
+  Timer? _syncTimer;
   bool _showAdFailureBanner = false;
 
   // Trend
@@ -53,6 +56,9 @@ class _HomeScreenState extends State<HomeScreen> {
     _initServices();
     _loadData();
     _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) => _loadData());
+    
+    // Smart sync every 5 minutes (only syncs aggregates, very cheap)
+    _syncTimer = Timer.periodic(const Duration(minutes: 5), (_) => _smartSync.smartSync());
   }
 
   Future<void> _initServices() async {
@@ -89,6 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _pollTimer?.cancel();
+    _syncTimer?.cancel();
     _ads.disposeBannerAd();
     super.dispose();
   }
