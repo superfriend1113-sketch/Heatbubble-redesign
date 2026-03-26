@@ -221,7 +221,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     labelStyle: TextStyle(color: Colors.grey[400]),
                     prefixIcon: Icon(Icons.person_outline, color: Colors.grey[400]),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
+                    fillColor: Colors.white.withValues(alpha: 0.1),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -249,7 +249,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     labelStyle: TextStyle(color: Colors.grey[400]),
                     prefixIcon: Icon(Icons.email_outlined, color: Colors.grey[400]),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
+                    fillColor: Colors.white.withValues(alpha: 0.1),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -286,7 +286,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       },
                     ),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
+                    fillColor: Colors.white.withValues(alpha: 0.1),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,
@@ -323,7 +323,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       },
                     ),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.1),
+                    fillColor: Colors.white.withValues(alpha: 0.1),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide.none,

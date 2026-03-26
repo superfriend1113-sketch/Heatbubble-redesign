@@ -191,7 +191,6 @@ class NudgeService {
   // Comparison-based notification (random interval)
   // ─────────────────────────────────────────────────────
   Future<void> sendComparisonNotification(ComparisonResult result) async {
-    final title = _comparisonTitle(result.type);
     await _sendStandardNotification(result.message);
 
     final alertType = result.diff > 0 ? AlertType.risingTrend
@@ -203,19 +202,6 @@ class NudgeService {
       message: result.message,
       timestamp: DateTime.now(),
     ));
-  }
-
-  String _comparisonTitle(ComparisonType type) {
-    switch (type) {
-      case ComparisonType.hoursAgo:
-        return 'HeatBubble — Hourly Check';
-      case ComparisonType.yesterdaySameTime:
-        return 'HeatBubble — Daily Compare';
-      case ComparisonType.dailyAverage:
-        return 'HeatBubble — Today\'s Trend';
-      case ComparisonType.weekAverage:
-        return 'HeatBubble — Weekly Insight';
-    }
   }
 }
 

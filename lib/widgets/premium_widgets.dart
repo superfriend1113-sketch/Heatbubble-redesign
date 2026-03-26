@@ -1,8 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../services/ads_service.dart';
 import '../services/subscription_service.dart';
 import '../screens/paywall_screen.dart';
@@ -20,7 +17,6 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
   final _ads = AdsService();
   final _subscription = SubscriptionService();
   bool _showFallback = false;
-  bool _adLoadTimeout = false;
 
   @override
   void initState() {
@@ -41,7 +37,6 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
       if (mounted && !_ads.isAdLoaded) {
         debugPrint('⏱️  [AdBannerWidget] Ad load timeout - showing fallback');
         setState(() {
-          _adLoadTimeout = true;
           _showFallback = true;
         });
       }

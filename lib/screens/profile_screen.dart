@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/firebase_auth_service.dart';
@@ -23,7 +22,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   final _subscription = SubscriptionService();
 
   bool _isSyncing = false;
-  Map<String, dynamic>? _userProfile;
   Map<String, dynamic>? _cloudStats;
 
   @override
@@ -38,15 +36,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     try {
       final userId = _auth.currentUser!.uid;
       
-      // Load user profile
-      final profile = await _firestore.getUserProfile(userId);
-      
       // Load cloud statistics
       final stats = await _firestore.getUserStats(userId);
       
       if (mounted) {
         setState(() {
-          _userProfile = profile;
           _cloudStats = stats;
         });
       }
@@ -196,7 +190,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       await _auth.signOut();
       if (mounted) {
         setState(() {
-          _userProfile = null;
           _cloudStats = null;
         });
         _showMessage('Signed out successfully', isError: false);
@@ -324,10 +317,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.white.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha: 0.1),
                 ),
               ),
               child: Column(
@@ -396,7 +389,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     decoration: BoxDecoration(
                       color: isPremium
-                          ? const Color(0xFFFF6B35).withOpacity(0.2)
+                          ? const Color(0xFFFF6B35).withValues(alpha: 0.2)
                           : Colors.grey.shade800,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
@@ -545,7 +538,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               )
             else
               _actionTile(
-                icon: LucideIcons.checkCircle,
+                icon: LucideIcons.check,
                 title: 'Premium Active',
                 subtitle: 'Thank you for your support!',
                 onTap: null,
@@ -629,10 +622,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
-        borderRadius: BorderRadius.circular(12),
+        color: Colors.white.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
         ),
       ),
       child: Column(
@@ -670,10 +663,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.05),
+        color: Colors.white.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.white.withOpacity(0.1),
+          color: Colors.white.withValues(alpha: 0.1),
         ),
       ),
       child: ListTile(
@@ -681,7 +674,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         leading: Container(
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: (iconColor ?? const Color(0xFFFF6B35)).withOpacity(0.2),
+            color: (iconColor ?? const Color(0xFFFF6B35)).withValues(alpha: 0.2),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Icon(
@@ -764,7 +757,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Navigator.pop(context);
       },
       leading: Icon(
-        isSelected ? LucideIcons.checkCircle2 : LucideIcons.circle,
+        isSelected ? LucideIcons.check : LucideIcons.circle,
         color: isSelected ? const Color(0xFFFF6B35) : Colors.grey.shade600,
       ),
       title: Text(

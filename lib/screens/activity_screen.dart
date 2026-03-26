@@ -34,22 +34,6 @@ class _ActivityScreenState extends State<ActivityScreen> {
     }
   }
 
-  // ── Color & icon by absolute temperature ──
-  Color _tempColor(double t) {
-    if (t < 35.0) return const Color(0xFF4FC3F7);
-    if (t >= 40.0) return const Color(0xFFFF6B35);
-    return Colors.white;
-  }
-
-  IconData _trendIcon(int index) {
-    if (index == 0) return LucideIcons.moveRight;
-    final prev = _weekReadings.reversed.toList()[index - 1].temperature;
-    final curr = _weekReadings.reversed.toList()[index].temperature;
-    if (curr > prev + 0.1) return LucideIcons.trendingUp;
-    if (curr < prev - 0.1) return LucideIcons.trendingDown;
-    return LucideIcons.moveRight;
-  }
-
   bool get _hasMultiDayData {
     if (_weekReadings.isEmpty) return false;
     final firstDay = DateFormat('yyyy-MM-dd').format(_weekReadings.first.timestamp);

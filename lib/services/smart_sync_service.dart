@@ -51,46 +51,6 @@ class SmartSyncService {
     }
   }
 
-  /// Sync only recent readings (last 7 days)
-  Future<void> _syncRecentReadings() async {
-    try {
-      final userId = _auth.currentUser!.uid;
-      final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
-      
-      // Get readings from last 7 days
-      final allReadings = await _storage.getLast7Days();
-      final recentReadings = allReadings
-          .where((r) => r.timestamp.isAfter(sevenDaysAgo))
-          .toList();
-      
-      if (recentReadings.isEmpty) {
-        debugPrint('   - No recent readings to sync');
-        return;
-      }
-      
-      debugPrint('   - Syncing ${recentReadings.length} recent readings');
-      
-      // Batch upload (max 500 at a time to avoid timeout)
-      const batchSize = 500;
-      for (var i = 0; i < recentReadings.length; i += batchSize) {
-        final end = (i + batchSize < recentReadings.length) 
-            ? i + batchSize 
-            : recentReadings.length;
-        final batch = recentReadings.sublist(i, end);
-        
-        await _firestore.batchSaveReadings(
-          userId: userId,
-          readingsList: batch,
-        );
-      }
-      
-      debugPrint('   ✅ Recent readings synced');
-    } catch (e) {
-      debugPrint('   ❌ Failed to sync recent readings: $e');
-      rethrow;
-    }
-  }
-
   /// Sync aggregated data (hourly and daily summaries)
   /// This is MUCH cheaper than storing individual readings
   /// NO individual readings are synced - all data stays local
@@ -239,37 +199,6 @@ class SmartSyncService {
     }
   }
 
-  /// Clean up old individual readings from cloud (keep only 7 days)
-  Future<void> _cleanupOldReadings() async {
-    try {
-      final userId = _auth.currentUser!.uid;
-      final sevenDaysAgo = DateTime.now().subtract(const Duration(days: 7));
-      
-      // Query old readings
-      final oldReadings = await _firestore.readings
-          .where('userId', isEqualTo: userId)
-          .where('timestamp', isLessThan: sevenDaysAgo)
-          .get();
-      
-      if (oldReadings.docs.isEmpty) {
-        debugPrint('   - No old readings to clean up');
-        return;
-      }
-      
-      debugPrint('   - Cleaning up ${oldReadings.docs.length} old readings');
-      
-      // Delete in batches
-      for (var doc in oldReadings.docs) {
-        await doc.reference.delete();
-      }
-      
-      debugPrint('   ✅ Old readings cleaned up');
-    } catch (e) {
-      debugPrint('   ❌ Failed to cleanup old readings: $e');
-      // Don't rethrow - cleanup failure shouldn't block sync
-    }
-  }
-
   DateTime _parseHourKey(String hourKey) {
     final parts = hourKey.split('-');
     return DateTime(
@@ -307,7 +236,7 @@ class SmartSyncService {
           .orderBy('timestamp')
           .get();
       
-      return snapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+      return snapshot.docs.map((doc) => doc.data()).toList();
     } catch (e) {
       debugPrint('❌ [SmartSync] Failed to get hourly chart data: $e');
       return [];
@@ -332,7 +261,7 @@ class SmartSyncService {
           .orderBy('timestamp')
           .get();
       
-      return snapshot.docs.map((doc) => doc.data() as Map<String, dynamic>).toList();
+      return snapshot.docs.map((doc) => doc.data()).toList();
     } catch (e) {
       debugPrint('❌ [SmartSync] Failed to get daily chart data: $e');
       return [];

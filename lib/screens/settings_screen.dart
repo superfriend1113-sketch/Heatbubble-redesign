@@ -708,43 +708,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _unitOptionDisabled({
-    required String title,
-    required String subtitle,
-  }) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 18),
-      decoration: BoxDecoration(
-        color: Colors.white.withAlpha(40),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withAlpha(60)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: const Color(0xFF111827).withAlpha(130),
-              fontSize: 15,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            subtitle,
-            style: TextStyle(
-              color: const Color(0xFF6B7280).withAlpha(130),
-              fontSize: 13,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ── Toggle row ──
   Widget _toggleRow({
     required String title,
@@ -781,8 +744,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: const Color(0xFFFF6B35),
-          activeTrackColor: const Color(0xFF111827),
+          activeThumbColor: Colors.white,
+          activeTrackColor: const Color(0xFFFF6B35),
           inactiveTrackColor: const Color(0xFF9CA3AF),
           inactiveThumbColor: Colors.white,
         ),

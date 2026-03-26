@@ -1,24 +1,17 @@
 import 'dart:async';
-import 'dart:isolate';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/sensor_service.dart';
 import '../services/storage_service.dart';
 import '../services/unit_service.dart';
-import '../services/nudge_service.dart';
-import '../services/comparison_service.dart';
 import '../services/subscription_service.dart';
 import '../services/ads_service.dart';
 import '../services/reading_counter_service.dart';
 import '../services/smart_sync_service.dart';
 import '../models/temp_reading.dart';
 import '../widgets/premium_widgets.dart';
-import '../widgets/hourly_chart_widget.dart';
 import '../widgets/ad_failure_banner.dart';
 import '../widgets/gentle_upgrade_dialog.dart';
-import '../screens/paywall_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -30,8 +23,6 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _sensor = SensorService();
   final _storage = StorageService();
-  final _nudge = NudgeService();
-  final _comparison = ComparisonService();
   final _subscription = SubscriptionService();
   final _ads = AdsService();
   final _readingCounter = ReadingCounterService();
@@ -39,8 +30,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   double _currentTemp = 0;
   double _avgTemp = 0;
-  bool _isCharging = false;
-  bool _isStable = true;
   bool _showAiBanner = true;
   Timer? _pollTimer;
   Timer? _syncTimer;
@@ -163,8 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _currentTemp = temp;
           _avgTemp = avg;
-          _isCharging = result.isCharging;
-          _isStable = result.isStable;
+          // _isCharging and _isStable removed as unused
           _variance = variance;
           _trendLabel = trend;
         });

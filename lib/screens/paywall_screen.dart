@@ -235,7 +235,7 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: const Color(0xFFFF6B35).withOpacity(0.3),
+                                color: const Color(0xFFFF6B35).withValues(alpha: 0.3),
                                 blurRadius: 20,
                                 offset: const Offset(0, 8),
                               ),
@@ -379,7 +379,7 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFFFF6B35).withOpacity(0.1),
+              color: const Color(0xFFFF6B35).withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(
@@ -448,7 +448,7 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
           boxShadow: [
             if (isBestValue)
               BoxShadow(
-                color: const Color(0xFFFF6B35).withOpacity(0.3),
+                color: const Color(0xFFFF6B35).withValues(alpha: 0.3),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               ),

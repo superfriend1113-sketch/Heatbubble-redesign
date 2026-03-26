@@ -89,7 +89,7 @@ Future<void> _initializeMobileAds() async {
 
 /// Initialize background work manager
 Future<void> _initializeBackgroundWork() async {
-  await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
+  await Workmanager().initialize(callbackDispatcher);
   initBackgroundPolling();
 }
 

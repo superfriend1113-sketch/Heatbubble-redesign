@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../models/alert.dart';
 import '../services/custom_alert_service.dart';
-import '../services/storage_service.dart';
 import '../services/subscription_service.dart';
 
 class CustomAlertsScreen extends StatefulWidget {
@@ -14,13 +13,12 @@ class CustomAlertsScreen extends StatefulWidget {
 
 class _CustomAlertsScreenState extends State<CustomAlertsScreen> {
   final _alertService = CustomAlertService();
-  final _storage = StorageService();
   final _subscription = SubscriptionService();
   
   List<Alert> _alerts = [];
-  String _selectedUnit = 'C';
-  double _sliderValue = 37.8;
-  String _conditionValue = 'above';
+  final _selectedUnit = 'C';
+  final _sliderValue = 37.8;
+  final _conditionValue = 'above';
 
   @override
   void initState() {

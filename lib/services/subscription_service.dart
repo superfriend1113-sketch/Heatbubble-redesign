@@ -48,7 +48,7 @@ class SubscriptionService {
     final bool available = await iap.isAvailable();
 
     if (!available) {
-      print('In-App Purchase not available');
+      debugPrint('In-App Purchase not available');
       return;
     }
 
@@ -62,9 +62,9 @@ class SubscriptionService {
       final ProductDetailsResponse response = await iap.queryProductDetails(ids);
 
       _products = response.productDetails;
-      print('Products loaded: ${_products.length}');
+      debugPrint('Products loaded: ${_products.length}');
     } catch (e) {
-      print('Error loading products: $e');
+      debugPrint('Error loading products: $e');
     }
   }
 
@@ -80,7 +80,7 @@ class SubscriptionService {
       await iap.buyNonConsumable(purchaseParam: purchaseParam);
       return true;
     } catch (e) {
-      print('Purchase error: $e');
+      debugPrint('Purchase error: $e');
       return false;
     }
   }
@@ -97,7 +97,7 @@ class SubscriptionService {
       await iap.buyConsumable(purchaseParam: purchaseParam);
       return true;
     } catch (e) {
-      print('Purchase error: $e');
+      debugPrint('Purchase error: $e');
       return false;
     }
   }
@@ -171,7 +171,7 @@ class SubscriptionService {
       // Update premium status based on restored purchases
       await _loadPremiumStatus();
     } catch (e) {
-      print('Restore purchases error: $e');
+      debugPrint('Restore purchases error: $e');
     }
   }
 

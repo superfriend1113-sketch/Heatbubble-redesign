@@ -76,9 +76,9 @@ class _HourlyTemperatureChartState extends State<HourlyTemperatureChart> {
   /// Convert temperature to display unit
   double _convertTemp(double celsius) {
     final unit = _unitService.unit;
-    if (unit == 'F') {
+    if (unit == TempUnit.fahrenheit) {
       return celsius * 9 / 5 + 32;
-    } else if (unit == 'K') {
+    } else if (unit == TempUnit.kelvin) {
       return celsius + 273.15;
     }
     return celsius;
@@ -126,8 +126,8 @@ class _HourlyTemperatureChartState extends State<HourlyTemperatureChart> {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            const Color(0xFFFF6B35).withOpacity(0.1),
-            const Color(0xFF4FC3F7).withOpacity(0.1),
+            const Color(0xFFFF6B35).withValues(alpha: 0.1),
+            const Color(0xFF4FC3F7).withValues(alpha: 0.1),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -224,7 +224,7 @@ class _HourlyTemperatureChartState extends State<HourlyTemperatureChart> {
                     ),
                     belowBarData: BarAreaData(
                       show: true,
-                      color: const Color(0xFFFF6B35).withOpacity(0.2),
+                        color: const Color(0xFFFF6B35).withValues(alpha: 0.2),
                     ),
                   ),
                 ],

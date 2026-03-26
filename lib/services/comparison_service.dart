@@ -153,16 +153,20 @@ class ComparisonService {
     final timeLabel = hours == 1 ? '1 hour' : '$hours hours';
 
     if (diff > 0) {
-      if (diff >= 3)
+      if (diff >= 3) {
         return '🔥 Your temperature jumped $abs°C in the last $timeLabel — stay hydrated!';
-      if (diff >= 1.5)
+      }
+      if (diff >= 1.5) {
         return '🌡️ Up $abs°C from $timeLabel ago — your body is warming up.';
+      }
       return '📈 Slightly warmer ($abs°C) compared to $timeLabel ago.';
     } else {
-      if (diff <= -3)
+      if (diff <= -3) {
         return '🧊 Your temperature dropped $abs°C in $timeLabel — are you somewhere cold?';
-      if (diff <= -1.5)
+      }
+      if (diff <= -1.5) {
         return '❄️ Down $abs°C from $timeLabel ago — cooling down noticeably.';
+      }
       return '📉 Slightly cooler ($abs°C) compared to $timeLabel ago.';
     }
   }
@@ -183,12 +187,14 @@ class ComparisonService {
       return '📊 Almost identical to this time yesterday — your pattern is consistent!';
     }
     if (diff > 0) {
-      if (diff >= 2)
+      if (diff >= 2) {
         return '🔥 You\'re $abs°C warmer than this time yesterday — notable increase.';
+      }
       return '🌡️ A bit warmer ($abs°C) than this time yesterday.';
     } else {
-      if (diff <= -2)
+      if (diff <= -2) {
         return '🧊 You\'re $abs°C cooler than yesterday at this hour.';
+      }
       return '❄️ Slightly cooler ($abs°C) than this time yesterday.';
     }
   }
@@ -196,12 +202,14 @@ class ComparisonService {
   String _dailyAvgMessage(double diff) {
     final abs = diff.abs().toStringAsFixed(1);
     if (diff > 0) {
-      if (diff >= 2)
+      if (diff >= 2) {
         return '📈 Currently $abs°C above today\'s average — running warm!';
+      }
       return '🌡️ You\'re $abs°C above your average today.';
     } else {
-      if (diff <= -2)
+      if (diff <= -2) {
         return '📉 Currently $abs°C below today\'s average — running cool.';
+      }
       return '❄️ You\'re $abs°C below your average today.';
     }
   }
@@ -212,12 +220,14 @@ class ComparisonService {
       return '📊 Right on track — matching your weekly average perfectly.';
     }
     if (diff > 0) {
-      if (diff >= 3)
+      if (diff >= 3) {
         return '🔥 $abs°C above your weekly average — significantly warmer than usual!';
+      }
       return '🌡️ Running $abs°C warmer than your week average.';
     } else {
-      if (diff <= -3)
+      if (diff <= -3) {
         return '🧊 $abs°C below your weekly average — much cooler than usual.';
+      }
       return '❄️ Running $abs°C cooler than your week average.';
     }
   }
