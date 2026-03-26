@@ -24,9 +24,10 @@ class SmartSyncService {
   static const String _lastAggregateKey = 'last_aggregate_sync';
 
   /// Sync strategy:
-  /// - Individual readings: Last 7 days only
-  /// - Aggregated data: Hourly summaries (forever)
+  /// - NO individual readings synced to cloud (all stored locally)
+  /// - Aggregated data only: Hourly summaries (forever)
   /// - Daily summaries: Forever
+  /// - Even cheaper and more private!
   Future<void> smartSync() async {
     if (!_auth.isSignedIn) {
       debugPrint('⚠️  [SmartSync] Not signed in, skipping sync');
@@ -36,14 +37,8 @@ class SmartSyncService {
     try {
       debugPrint('🔄 [SmartSync] Starting smart sync...');
       
-      // 1. Sync recent individual readings (last 7 days)
-      await _syncRecentReadings();
-      
-      // 2. Sync aggregated data (hourly/daily summaries)
+      // Only sync aggregated data (no individual readings)
       await _syncAggregates();
-      
-      // 3. Clean up old individual readings from cloud (keep only 7 days)
-      await _cleanupOldReadings();
       
       // Update last sync time
       final prefs = await SharedPreferences.getInstance();
@@ -98,6 +93,7 @@ class SmartSyncService {
 
   /// Sync aggregated data (hourly and daily summaries)
   /// This is MUCH cheaper than storing individual readings
+  /// NO individual readings are synced - all data stays local
   Future<void> _syncAggregates() async {
     try {
       final userId = _auth.currentUser!.uid;

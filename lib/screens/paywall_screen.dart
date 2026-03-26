@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:in_app_purchase/in_app_purchase.dart';
 import '../services/subscription_service.dart';
 
 class PaywallScreen extends StatefulWidget {
@@ -9,315 +11,403 @@ class PaywallScreen extends StatefulWidget {
   State<PaywallScreen> createState() => _PaywallScreenState();
 }
 
-class _PaywallScreenState extends State<PaywallScreen> {
+class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProviderStateMixin {
   final _subscription = SubscriptionService();
-  bool _isLoading = false;
+  final InAppPurchase _iap = InAppPurchase.instance;
+  
+  bool _isLoading = true;
+  bool _isPurchasing = false;
+  String? _selectedProductId;
+  StreamSubscription<List<PurchaseDetails>>? _purchaseSubscription;
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    _subscription.init();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _animationController,
+      curve: Curves.easeInOut,
+    );
+    _animationController.forward();
+    
+    _initializeIAP();
   }
 
-  Future<void> _purchaseOneTime() async {
-    setState(() => _isLoading = true);
+  Future<void> _initializeIAP() async {
+    // Listen to purchase updates
+    _purchaseSubscription = _iap.purchaseStream.listen(
+      _handlePurchaseUpdates,
+      onDone: () => _purchaseSubscription?.cancel(),
+      onError: (error) {
+        debugPrint('❌ [Paywall] Purchase stream error: $error');
+        _showError('Purchase failed: $error');
+      },
+    );
+
+    // Initialize subscription service
+    await _subscription.init();
+    
+    setState(() => _isLoading = false);
+  }
+
+  void _handlePurchaseUpdates(List<PurchaseDetails> purchases) {
+    for (var purchase in purchases) {
+      debugPrint('📦 [Paywall] Purchase update: ${purchase.status}');
+      
+      if (purchase.status == PurchaseStatus.purchased) {
+        _handleSuccessfulPurchase(purchase);
+      } else if (purchase.status == PurchaseStatus.error) {
+        _showError('Purchase failed: ${purchase.error?.message}');
+        setState(() => _isPurchasing = false);
+      } else if (purchase.status == PurchaseStatus.canceled) {
+        setState(() => _isPurchasing = false);
+      }
+
+      // Complete pending purchases
+      if (purchase.pendingCompletePurchase) {
+        _iap.completePurchase(purchase);
+      }
+    }
+  }
+
+  Future<void> _handleSuccessfulPurchase(PurchaseDetails purchase) async {
     try {
-      final success = await _subscription.purchaseOneTime();
-      if (success) {
-        await _subscription.setPremium(true);
+      await _subscription.setPremium(
+        true,
+        purchaseId: purchase.purchaseID,
+        productId: purchase.productID,
+      );
+      
+      if (mounted) {
+        _showSuccess('Premium unlocked! 🎉');
+        await Future.delayed(const Duration(seconds: 1));
         if (mounted) {
           Navigator.pop(context, true);
         }
       }
     } catch (e) {
+      debugPrint('❌ [Paywall] Error handling purchase: $e');
+      _showError('Failed to activate premium: $e');
+    } finally {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Purchase failed: $e',
-              style: const TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
+        setState(() => _isPurchasing = false);
       }
+    }
+  }
+
+  Future<void> _purchaseProduct(String productId) async {
+    if (_isPurchasing) return;
+
+    setState(() {
+      _isPurchasing = true;
+      _selectedProductId = productId;
+    });
+
+    try {
+      final product = _subscription.products.firstWhere(
+        (p) => p.id == productId,
+        orElse: () => throw Exception('Product not found. Please try again.'),
+      );
+
+      final purchaseParam = PurchaseParam(productDetails: product);
+      
+      // Determine purchase type
+      if (productId == SubscriptionService.oneTimePurchaseId) {
+        await _iap.buyNonConsumable(purchaseParam: purchaseParam);
+      } else {
+        await _iap.buyConsumable(purchaseParam: purchaseParam);
+      }
+    } catch (e) {
+      debugPrint('❌ [Paywall] Purchase error: $e');
+      _showError(e.toString());
+      setState(() => _isPurchasing = false);
+    }
+  }
+
+  Future<void> _restorePurchases() async {
+    setState(() => _isLoading = true);
+    
+    try {
+      await _iap.restorePurchases();
+      _showSuccess('Purchases restored successfully');
+    } catch (e) {
+      _showError('Failed to restore purchases: $e');
     } finally {
       setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _purchaseMonthly() async {
-    setState(() => _isLoading = true);
-    try {
-      final success = await _subscription.purchaseMonthly();
-      if (success) {
-        await _subscription.setPremium(true);
-        if (mounted) {
-          Navigator.pop(context, true);
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Purchase failed: $e',
-              style: const TextStyle(color: Colors.white),
-            ),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    } finally {
-      setState(() => _isLoading = false);
-    }
+  void _showError(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showSuccess(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.white),
+        ),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _purchaseSubscription?.cancel();
+    _animationController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    
     return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      constraints: BoxConstraints(
+        maxHeight: screenHeight * 0.9,
       ),
-      child: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header
-              Center(
-                child: Column(
-                  children: [
-                    Container(
-                      width: 50,
-                      height: 5,
-                      margin: const EdgeInsets.only(bottom: 20),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[300],
-                        borderRadius: BorderRadius.circular(2.5),
-                      ),
-                    ),
-                    const Text(
-                      '🌡️ HeatBubble Premium',
-                      style: TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF111827),
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Unlock all features',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 32),
-
-              // Features Checklist
-              _featureItem('Hourly temperature charts'),
-              const SizedBox(height: 16),
-              _featureItem('Custom heat alerts'),
-              const SizedBox(height: 16),
-              _featureItem('No ads ever'),
-              const SizedBox(height: 16),
-              _featureItem('Home screen widget'),
-              const SizedBox(height: 16),
-              _featureItem('Advanced analytics'),
-              const SizedBox(height: 32),
-
-              // Price Cards
-              Row(
-                children: [
-                  // Monthly Card (Left)
-                  Expanded(
-                    child: _priceCard(
-                      title: 'Monthly',
-                      price: '\$1.99',
-                      period: '/month',
-                      isBestValue: false,
-                      onTap: _isLoading ? null : _purchaseMonthly,
-                      isLoading: _isLoading,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // One-Time Card (Right - Highlighted)
-                  Expanded(
-                    child: _priceCard(
-                      title: 'One-Time',
-                      price: '\$2.99',
-                      period: 'lifetime',
-                      isBestValue: true,
-                      onTap: _isLoading ? null : _purchaseOneTime,
-                      isLoading: _isLoading,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Main CTA Button
-              SizedBox(
-                width: double.infinity,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFFFF6B35), Color(0xFFFF8555)],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      onTap: _isLoading ? null : _purchaseOneTime,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  valueColor:
-                                      AlwaysStoppedAnimation<Color>(Colors.white),
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text(
-                                'Unlock Premium - \$2.99',
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-
-              // Restore Purchases
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: _isLoading ? null : () => _subscription.restorePurchases(),
-                  child: const Text(
-                    'Restore purchases',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ),
-              ),
-            ],
-          ),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFFFFF5F0),
+            Colors.white,
+          ],
         ),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-    );
-  }
-
-  Widget _featureItem(String text) {
-    return Row(
-      children: [
-        Icon(
-          LucideIcons.check,
-          size: 20,
-          color: const Color(0xFFFF6B35),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 14,
-              color: Color(0xFF111827),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _priceCard({
-    required String title,
-    required String price,
-    required String period,
-    required bool isBestValue,
-    required VoidCallback? onTap,
-    required bool isLoading,
-  }) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(
-          color: isBestValue ? const Color(0xFFFF6B35) : Colors.grey[300]!,
-          width: isBestValue ? 2 : 1,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        color: isBestValue ? const Color(0xFFFFF5F0) : Colors.white,
-      ),
-      child: Stack(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              children: [
-                if (isBestValue)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFF6B35),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: const Text(
-                      'BEST VALUE',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF111827),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                RichText(
-                  text: TextSpan(
+      child: _isLoading
+          ? const Center(
+              child: CircularProgressIndicator(
+                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6B35)),
+              ),
+            )
+          : FadeTransition(
+              opacity: _fadeAnimation,
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      TextSpan(
-                        text: price,
-                        style: const TextStyle(
-                          fontSize: 18,
+                      // Drag handle
+                      Center(
+                        child: Container(
+                          width: 40,
+                          height: 4,
+                          margin: const EdgeInsets.only(bottom: 24),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[300],
+                            borderRadius: BorderRadius.circular(2),
+                          ),
+                        ),
+                      ),
+
+                      // Premium badge
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            gradient: const LinearGradient(
+                              colors: [Color(0xFFFF6B35), Color(0xFFFF8555)],
+                            ),
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(0xFFFF6B35).withOpacity(0.3),
+                                blurRadius: 20,
+                                offset: const Offset(0, 8),
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            LucideIcons.crown,
+                            color: Colors.white,
+                            size: 32,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // Title
+                      const Text(
+                        'Upgrade to Premium',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 28,
                           fontWeight: FontWeight.bold,
                           color: Color(0xFF111827),
                         ),
                       ),
-                      TextSpan(
-                        text: '\n$period',
+                      const SizedBox(height: 8),
+                      Text(
+                        'Unlock all features and remove ads',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
-                          fontSize: 10,
+                          fontSize: 15,
                           color: Colors.grey[600],
+                        ),
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Features list
+                      _buildFeatureItem(
+                        LucideIcons.lineChart,
+                        'Hourly Temperature Charts',
+                        'Track temperature trends hour by hour',
+                      ),
+                      const SizedBox(height: 16),
+                      _buildFeatureItem(
+                        LucideIcons.bell,
+                        'Custom Heat Alerts',
+                        'Get notified when temperature changes',
+                      ),
+                      const SizedBox(height: 16),
+                      _buildFeatureItem(
+                        LucideIcons.sparkles,
+                        'No Ads Ever',
+                        'Enjoy ad-free experience forever',
+                      ),
+                      const SizedBox(height: 16),
+                      _buildFeatureItem(
+                        LucideIcons.cloud,
+                        'Cloud Backup & Sync',
+                        'Access your data across devices',
+                      ),
+                      const SizedBox(height: 16),
+                      _buildFeatureItem(
+                        LucideIcons.barChart,
+                        'Advanced Analytics',
+                        'Deep insights into your temperature data',
+                      ),
+                      const SizedBox(height: 32),
+
+                      // Price options
+                      if (_subscription.products.isNotEmpty) ...[
+                        _buildPriceOption(
+                          productId: SubscriptionService.oneTimePurchaseId,
+                          title: 'Lifetime Access',
+                          price: _getProductPrice(SubscriptionService.oneTimePurchaseId),
+                          period: 'One-time payment',
+                          isBestValue: true,
+                          savings: 'Best Value',
+                        ),
+                        const SizedBox(height: 12),
+                        _buildPriceOption(
+                          productId: SubscriptionService.monthlySubscriptionId,
+                          title: 'Monthly',
+                          price: _getProductPrice(SubscriptionService.monthlySubscriptionId),
+                          period: 'Per month',
+                          isBestValue: false,
+                          savings: null,
+                        ),
+                      ] else
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          child: Text(
+                            'Loading pricing...',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey[600]),
+                          ),
+                        ),
+
+                      const SizedBox(height: 24),
+
+                      // Restore purchases button
+                      TextButton(
+                        onPressed: _isLoading ? null : _restorePurchases,
+                        child: Text(
+                          'Restore Purchases',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+
+                      const SizedBox(height: 8),
+
+                      // Terms
+                      Text(
+                        'Payment will be charged to your Google Play account. Subscription automatically renews unless auto-renew is turned off at least 24 hours before the end of the current period.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.grey[500],
+                          height: 1.4,
                         ),
                       ),
                     ],
                   ),
-                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+    );
+  }
+
+  Widget _buildFeatureItem(IconData icon, String title, String description) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey[200]!),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF6B35).withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(
+              icon,
+              color: const Color(0xFFFF6B35),
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF111827),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  description,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                  ),
                 ),
               ],
             ),
@@ -325,5 +415,125 @@ class _PaywallScreenState extends State<PaywallScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildPriceOption({
+    required String productId,
+    required String title,
+    required String price,
+    required String period,
+    required bool isBestValue,
+    String? savings,
+  }) {
+    final isSelected = _selectedProductId == productId;
+    final isThisPurchasing = _isPurchasing && isSelected;
+
+    return GestureDetector(
+      onTap: isThisPurchasing ? null : () => _purchaseProduct(productId),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: isBestValue
+              ? const LinearGradient(
+                  colors: [Color(0xFFFF6B35), Color(0xFFFF8555)],
+                )
+              : null,
+          color: isBestValue ? null : Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isBestValue ? Colors.transparent : Colors.grey[300]!,
+            width: 2,
+          ),
+          boxShadow: [
+            if (isBestValue)
+              BoxShadow(
+                color: const Color(0xFFFF6B35).withOpacity(0.3),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        title,
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: isBestValue ? Colors.white : const Color(0xFF111827),
+                        ),
+                      ),
+                      if (savings != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            savings,
+                            style: const TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFFF6B35),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    period,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: isBestValue ? Colors.white70 : Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (isThisPurchasing)
+              const SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+              )
+            else
+              Text(
+                price,
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: isBestValue ? Colors.white : const Color(0xFF111827),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getProductPrice(String productId) {
+    try {
+      final product = _subscription.products.firstWhere((p) => p.id == productId);
+      return product.price;
+    } catch (e) {
+      return productId == SubscriptionService.oneTimePurchaseId ? '\$2.99' : '\$1.99';
+    }
   }
 }
