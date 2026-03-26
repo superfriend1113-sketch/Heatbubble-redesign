@@ -1,0 +1,63 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isImage() {
+      return request.resource.contentType.matches('image/.*');
+    }
+    
+    function isValidSize(maxSizeMB) {
+      return request.resource.size < maxSizeMB * 1024 * 1024;
+    }
+    
+    // User files - users can only access their own files
+    match /users/{userId}/{allPaths=**} {
+      // Read: User can read their own files
+      allow read: if isOwner(userId);
+      
+      // Write: User can write their own files with size limits
+      allow write: if isOwner(userId) && isValidSize(10); // 10MB max
+      
+      // Delete: User can delete their own files
+      allow delete: if isOwner(userId);
+    }
+    
+    // Profile pictures - specific rules
+    match /users/{userId}/profile.jpg {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && 
+                      isImage() && 
+                      isValidSize(5); // 5MB max for profile pics
+    }
+    
+    // Charts - specific rules
+    match /users/{userId}/charts/{chartId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && 
+                      isImage() && 
+                      isValidSize(2); // 2MB max for charts
+    }
+    
+    // Exports - specific rules
+    match /users/{userId}/exports/{fileName} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && 
+                      isValidSize(10); // 10MB max for exports
+    }
+    
+    // Deny all other access
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

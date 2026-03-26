@@ -1,0 +1,74 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+    
+    function isValidUser() {
+      return isSignedIn() && 
+             request.resource.data.keys().hasAll(['updatedAt']) &&
+             request.resource.data.updatedAt == request.time;
+    }
+    
+    function isValidReading() {
+      return isSignedIn() &&
+             request.resource.data.keys().hasAll(['userId', 'temperature', 'rawTemp', 'timestamp', 'createdAt']) &&
+             request.resource.data.userId == request.auth.uid &&
+             request.resource.data.temperature is number &&
+             request.resource.data.rawTemp is number &&
+             request.resource.data.timestamp is timestamp &&
+             request.resource.data.createdAt == request.time;
+    }
+    
+    // Users collection
+    // Users can read and write their own profile
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser();
+      allow update: if isOwner(userId) && isValidUser();
+      allow delete: if isOwner(userId);
+    }
+    
+    // Readings collection
+    // Users can only access their own temperature readings
+    match /readings/{readingId} {
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isValidReading();
+      allow update: if false; // Readings are immutable once created
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+    
+    // Subscriptions collection
+    // Users can read their own subscription status
+    // Only backend/admin can write (for security)
+    match /subscriptions/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if false; // Only backend can write subscription data
+      
+      // If you want to allow app to write (less secure but simpler):
+      // allow create, update: if isOwner(userId) && 
+      //                          request.resource.data.keys().hasAll(['userId', 'isPremium', 'updatedAt']) &&
+      //                          request.resource.data.userId == userId &&
+      //                          request.resource.data.updatedAt == request.time;
+    }
+    
+    // Analytics collection (optional - for tracking app usage)
+    match /analytics/{docId} {
+      allow read: if false; // Only backend reads
+      allow write: if isSignedIn(); // Users can write their own analytics
+    }
+    
+    // Deny all other access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

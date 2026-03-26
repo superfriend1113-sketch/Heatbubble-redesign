@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import '../services/unit_service.dart';
 import '../services/subscription_service.dart';
+import '../services/firebase_auth_service.dart';
+import '../services/firebase_sync_service.dart';
+import '../services/firebase_firestore_service.dart';
 import '../screens/paywall_screen.dart';
 import '../screens/custom_alerts_screen.dart';
+import '../screens/auth/login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -16,11 +20,98 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _autoDetectSensors = true;
   bool _batteryFallback = true;
   final _subscription = SubscriptionService();
+  final _auth = FirebaseAuthService();
+  final _sync = FirebaseSyncService();
+  final _firestore = FirebaseFirestoreService();
+  
+  bool _isSyncing = false;
+  Map<String, dynamic>? _cloudStats;
 
   @override
   void initState() {
     super.initState();
     _subscription.init();
+    _loadCloudData();
+  }
+
+  Future<void> _loadCloudData() async {
+    if (!_auth.isSignedIn) return;
+
+    try {
+      final userId = _auth.currentUser!.uid;
+      final stats = await _firestore.getUserStats(userId);
+      
+      if (mounted) {
+        setState(() => _cloudStats = stats);
+      }
+    } catch (e) {
+      debugPrint('Error loading cloud data: $e');
+    }
+  }
+
+  Future<void> _syncData() async {
+    if (!_auth.isSignedIn) {
+      _showMessage('Please sign in to sync data');
+      return;
+    }
+
+    setState(() => _isSyncing = true);
+
+    try {
+      await _sync.syncToCloud();
+      await _loadCloudData();
+      _showMessage('Data synced successfully', isError: false);
+    } catch (e) {
+      _showMessage('Sync failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+      }
+    }
+  }
+
+  Future<void> _signOut() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _auth.signOut();
+      if (mounted) {
+        setState(() => _cloudStats = null);
+        _showMessage('Signed out successfully', isError: false);
+      }
+    } catch (e) {
+      _showMessage('Sign out failed: $e');
+    }
+  }
+
+  void _showMessage(String message, {bool isError = true}) {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+      ),
+    );
   }
 
   @override
@@ -62,6 +153,194 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
             const SizedBox(height: 24),
+
+            // ── Account Section (Firebase) ──
+            _glassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        _auth.isSignedIn ? LucideIcons.user : LucideIcons.userX,
+                        size: 18,
+                        color: const Color(0xFF111827),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Account',
+                        style: TextStyle(
+                          color: Color(0xFF111827),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (_isSyncing) ...[
+                        const SizedBox(width: 8),
+                        const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6B35)),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  if (!_auth.isSignedIn) ...[
+                    // Not signed in
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[300],
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Not Signed In',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF111827),
+                                  ),
+                                ),
+                                Text(
+                                  'Sign in to sync your data',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFFFF6B35),
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: () async {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const LoginScreen(),
+                                ),
+                              );
+                              setState(() {});
+                              _loadCloudData();
+                            },
+                            child: const Text('Sign In'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    // Signed in
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withAlpha(30),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      _auth.currentUser?.displayName ?? 'User',
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFF111827),
+                                      ),
+                                    ),
+                                    Text(
+                                      _auth.currentUser?.email ?? 'Anonymous',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Icon(
+                                LucideIcons.check,
+                                color: const Color(0xFF10B981),
+                                size: 20,
+                              ),
+                            ],
+                          ),
+                          
+                          // Cloud stats
+                          if (_cloudStats != null) ...[
+                            const SizedBox(height: 12),
+                            Divider(color: Colors.grey[400]),
+                            const SizedBox(height: 8),
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _miniStat(
+                                  'Readings',
+                                  '${_cloudStats!['totalReadings'] ?? 0}',
+                                ),
+                                _miniStat(
+                                  'Avg Temp',
+                                  '${(_cloudStats!['avgTemp'] ?? 0.0).toStringAsFixed(1)}°',
+                                ),
+                              ],
+                            ),
+                          ],
+                          
+                          const SizedBox(height: 12),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _syncData,
+                                  icon: const Icon(LucideIcons.refreshCw, size: 16),
+                                  label: const Text('Sync'),
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: Color(0xFF111827)),
+                                    foregroundColor: const Color(0xFF111827),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: _signOut,
+                                  icon: const Icon(LucideIcons.logOut, size: 16),
+                                  label: const Text('Sign Out'),
+                                  style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: Colors.red.shade300),
+                                    foregroundColor: Colors.red,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
 
             // ── Subscription Status ──
             _glassCard(
@@ -126,6 +405,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFFF6B35),
+                              foregroundColor: Colors.white,
                             ),
                             onPressed: () {
                               showModalBottomSheet(
@@ -145,6 +425,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       width: double.infinity,
                       child: OutlinedButton(
                         onPressed: () => _subscription.restorePurchases(),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF111827),
+                          side: const BorderSide(color: Color(0xFF111827)),
+                        ),
                         child: const Text('Restore Purchases'),
                       ),
                     ),
@@ -512,6 +796,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
         border: Border.all(color: Colors.white.withAlpha(100), width: 1),
       ),
       child: child,
+    );
+  }
+
+  // ── Mini stat widget ──
+  Widget _miniStat(String label, String value) {
+    return Column(
+      children: [
+        Text(
+          value,
+          style: const TextStyle(
+            color: Color(0xFF111827),
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.grey[600],
+            fontSize: 11,
+          ),
+        ),
+      ],
     );
   }
 }

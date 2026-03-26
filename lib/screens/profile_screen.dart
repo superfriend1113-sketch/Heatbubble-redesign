@@ -1,7 +1,13 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import '../services/storage_service.dart';
+import '../services/firebase_auth_service.dart';
+import '../services/firebase_firestore_service.dart';
+import '../services/firebase_sync_service.dart';
+import '../services/subscription_service.dart';
 import '../services/unit_service.dart';
+import 'auth/login_screen.dart';
+import 'paywall_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -11,270 +17,684 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final _storage = StorageService();
+  final _auth = FirebaseAuthService();
+  final _firestore = FirebaseFirestoreService();
+  final _sync = FirebaseSyncService();
+  final _subscription = SubscriptionService();
 
-  int _daysTracked = 0;
-  double _avgTemp = 0;
-  int _streak = 0;
-  int _achievements = 0;
-  bool _loading = true;
+  bool _isSyncing = false;
+  Map<String, dynamic>? _userProfile;
+  Map<String, dynamic>? _cloudStats;
 
   @override
   void initState() {
     super.initState();
-    _loadData();
+    _loadUserData();
   }
 
-  Future<void> _loadData() async {
-    final days = await _storage.getUniqueDaysCount();
-    final avg = await _storage.getSevenDayAverage();
-    final streak = await _storage.getCurrentStreak();
+  Future<void> _loadUserData() async {
+    if (!_auth.isSignedIn) return;
 
-    // Achievements unlocked based on milestones
-    int ach = 0;
-    if (days >= 1) ach++;
-    if (days >= 7) ach++;
-    if (days >= 30) ach++;
-    if (streak >= 7) ach++;
-    if (avg > 0) ach++;
-
-    if (mounted) {
-      setState(() {
-        _daysTracked = days;
-        _avgTemp = avg;
-        _streak = streak;
-        _achievements = ach;
-        _loading = false;
-      });
+    try {
+      final userId = _auth.currentUser!.uid;
+      
+      // Load user profile
+      final profile = await _firestore.getUserProfile(userId);
+      
+      // Load cloud statistics
+      final stats = await _firestore.getUserStats(userId);
+      
+      if (mounted) {
+        setState(() {
+          _userProfile = profile;
+          _cloudStats = stats;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading user data: $e');
     }
   }
 
+  Future<void> _syncData() async {
+    if (!_auth.isSignedIn) {
+      _showMessage('Please sign in to sync data');
+      return;
+    }
+
+    setState(() => _isSyncing = true);
+
+    try {
+      await _sync.syncToCloud();
+      await _loadUserData();
+      _showMessage('Data synced successfully', isError: false);
+    } catch (e) {
+      _showMessage('Sync failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+      }
+    }
+  }
+
+  Future<void> _restoreData() async {
+    if (!_auth.isSignedIn) {
+      _showMessage('Please sign in to restore data');
+      return;
+    }
+
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Restore Data'),
+        content: const Text(
+          'This will restore your data from the cloud. Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Restore'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    setState(() => _isSyncing = true);
+
+    try {
+      await _sync.restoreFromCloud();
+      await _loadUserData();
+      _showMessage('Data restored successfully', isError: false);
+    } catch (e) {
+      _showMessage('Restore failed: $e');
+    } finally {
+      if (mounted) {
+        setState(() => _isSyncing = false);
+      }
+    }
+  }
+
+  Future<void> _signOut() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Sign Out'),
+        content: const Text('Are you sure you want to sign out?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Sign Out'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      await _auth.signOut();
+      if (mounted) {
+        setState(() {
+          _userProfile = null;
+          _cloudStats = null;
+        });
+        _showMessage('Signed out successfully', isError: false);
+      }
+    } catch (e) {
+      _showMessage('Sign out failed: $e');
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Account'),
+        content: const Text(
+          'This will permanently delete your account and all data. This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      // Delete cloud data first
+      await _sync.clearCloudData();
+      
+      // Delete account
+      await _auth.deleteAccount();
+      
+      if (mounted) {
+        _showMessage('Account deleted successfully', isError: false);
+      }
+    } catch (e) {
+      _showMessage('Delete failed: $e');
+    }
+  }
+
+  void _showMessage(String message, {bool isError = true}) {
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: isError ? Colors.red : Colors.green,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final mq = MediaQuery.of(context);
-    final sw = mq.size.width;
-    final sh = mq.size.height;
-    final hPad = (sw * 0.06).clamp(18.0, 28.0);
-    final topPad = mq.padding.top;
-
-    // Responsive sizing
-    final avatarSize = (sw * 0.26).clamp(90.0, 120.0);
-    final avatarFontSize = avatarSize * 0.3;
-    final nameFontSize = (sw * 0.065).clamp(22.0, 28.0);
-    final topGap = (sh * 0.04).clamp(24.0, 40.0);
-    final gridGap = (sh * 0.032).clamp(20.0, 36.0);
+    final user = _auth.currentUser;
+    final isSignedIn = _auth.isSignedIn;
+    final isPremium = _subscription.isPremium;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0A0A0F),
-      body: ListenableBuilder(
-        listenable: UnitService.instance,
-        builder: (context, _) => _loading
-            ? const Center(
-                child: CircularProgressIndicator(color: Color(0xFFFF6B35)),
-              )
-            : ListView(
-                padding: EdgeInsets.fromLTRB(hPad, topPad + topGap, hPad, 32),
-
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            // Header
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // ── Avatar ──
-                Center(
-                  child: Container(
-                    width: avatarSize,
-                    height: avatarSize,
+                const Text(
+                  'Profile',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                if (_isSyncing)
+                  const SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6B35)),
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // User Info Card
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.05),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withOpacity(0.1),
+                ),
+              ),
+              child: Column(
+                children: [
+                  // Avatar
+                  Container(
+                    width: 80,
+                    height: 80,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      gradient: const LinearGradient(
-                        begin: Alignment.topRight,
-                        end: Alignment.bottomLeft,
-                        colors: [Color(0xFFD0887A), Color(0xFF8AAEC8)],
+                      color: isPremium
+                          ? const Color(0xFFFF6B35)
+                          : Colors.grey.shade700,
+                    ),
+                    child: Icon(
+                      isSignedIn ? LucideIcons.user : LucideIcons.userX,
+                      size: 40,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Name/Email
+                  if (isSignedIn) ...[
+                    Text(
+                      user?.displayName ?? 'User',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: const Color(0xFFD0887A).withAlpha(50),
-                          blurRadius: 28,
-                          spreadRadius: 2,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      user?.email ?? 'Anonymous',
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ] else ...[
+                    const Text(
+                      'Not Signed In',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Sign in to sync your data',
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 16),
+
+                  // Premium Badge
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: isPremium
+                          ? const Color(0xFFFF6B35).withOpacity(0.2)
+                          : Colors.grey.shade800,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isPremium
+                            ? const Color(0xFFFF6B35)
+                            : Colors.grey.shade700,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isPremium ? LucideIcons.crown : LucideIcons.lock,
+                          size: 16,
+                          color: isPremium
+                              ? const Color(0xFFFF6B35)
+                              : Colors.grey.shade400,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          isPremium ? 'Premium' : 'Free',
+                          style: TextStyle(
+                            color: isPremium
+                                ? const Color(0xFFFF6B35)
+                                : Colors.grey.shade400,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ],
                     ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      'JD',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: avatarFontSize,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: 1,
-                      ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Cloud Stats (if signed in)
+            if (isSignedIn && _cloudStats != null) ...[
+              const Text(
+                'Cloud Statistics',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _statCard(
+                      'Readings',
+                      '${_cloudStats!['totalReadings'] ?? 0}',
+                      LucideIcons.activity,
                     ),
                   ),
-                ),
-
-                SizedBox(height: (sh * 0.022).clamp(14.0, 22.0)),
-
-                // ── Name ──
-                Text(
-                  'John Doe',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: nameFontSize,
-                    fontWeight: FontWeight.w700,
-                    height: 1.2,
-                    letterSpacing: -0.3,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: _statCard(
+                      'Avg Temp',
+                      '${(_cloudStats!['avgTemp'] ?? 0.0).toStringAsFixed(1)}°',
+                      LucideIcons.thermometer,
+                    ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 24),
+            ],
+
+            // Actions Section
+            const Text(
+              'Account',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            // Sign In / Sign Out
+            if (!isSignedIn)
+              _actionTile(
+                icon: LucideIcons.logIn,
+                title: 'Sign In',
+                subtitle: 'Sync your data across devices',
+                onTap: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const LoginScreen(),
+                    ),
+                  );
+                  setState(() {});
+                  _loadUserData();
+                },
+              )
+            else ...[
+              _actionTile(
+                icon: LucideIcons.refreshCw,
+                title: 'Sync Data',
+                subtitle: 'Upload local data to cloud',
+                onTap: _syncData,
+              ),
+              _actionTile(
+                icon: LucideIcons.download,
+                title: 'Restore Data',
+                subtitle: 'Download data from cloud',
+                onTap: _restoreData,
+              ),
+              _actionTile(
+                icon: LucideIcons.logOut,
+                title: 'Sign Out',
+                subtitle: 'Sign out of your account',
+                onTap: _signOut,
+              ),
+            ],
+
+            const SizedBox(height: 24),
+
+            // Premium Section
+            const Text(
+              'Premium',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            if (!isPremium)
+              _actionTile(
+                icon: LucideIcons.crown,
+                title: 'Upgrade to Premium',
+                subtitle: 'Unlock all features for \$2.99',
+                onTap: () async {
+                  await showModalBottomSheet(
+                    context: context,
+                    isScrollControlled: true,
+                    builder: (context) => const PaywallScreen(),
+                  );
+                  setState(() {});
+                },
+                iconColor: const Color(0xFFFF6B35),
+              )
+            else
+              _actionTile(
+                icon: LucideIcons.checkCircle,
+                title: 'Premium Active',
+                subtitle: 'Thank you for your support!',
+                onTap: null,
+                iconColor: Colors.green,
+              ),
+
+            const SizedBox(height: 24),
+
+            // Settings Section
+            const Text(
+              'Settings',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            _actionTile(
+              icon: LucideIcons.thermometer,
+              title: 'Temperature Unit',
+              subtitle: 'Change temperature display unit',
+              onTap: () => _showUnitPicker(),
+            ),
+
+            const SizedBox(height: 24),
+
+            // Danger Zone
+            if (isSignedIn) ...[
+              const Text(
+                'Danger Zone',
+                style: TextStyle(
+                  color: Colors.red,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
                 ),
+              ),
+              const SizedBox(height: 12),
+              _actionTile(
+                icon: LucideIcons.trash2,
+                title: 'Delete Account',
+                subtitle: 'Permanently delete your account',
+                onTap: _deleteAccount,
+                iconColor: Colors.red,
+              ),
+            ],
 
-                const SizedBox(height: 6),
+            const SizedBox(height: 24),
 
-                // ── Member since ──
-                const Text(
-                  'Member since Dec 2025',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Color(0xFF9CA3AF),
-                    fontSize: 14,
-                    fontWeight: FontWeight.w400,
+            // App Info
+            Center(
+              child: Column(
+                children: [
+                  Text(
+                    'HeatBubble v1.0.0',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 12,
+                    ),
                   ),
-                ),
-
-                SizedBox(height: gridGap),
-
-                // ── 2×2 Stats grid ──
-                _buildGrid(sw, sh),
-
-                const SizedBox(height: 32),
-              ],
-            ),         // closes ListView
-        ),             // closes ListenableBuilder
+                  const SizedBox(height: 4),
+                  Text(
+                    'Made with ❤️ for temperature tracking',
+                    style: TextStyle(
+                      color: Colors.grey.shade600,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 40),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildGrid(double sw, double sh) {
-    // Card height: ~38% of screen width (each card is ~half-screen wide)
-    final cardH = ((sw - 48) / 2 * 0.85).clamp(130.0, 180.0);
-
-    return Column(
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: _StatCard(
-                icon: LucideIcons.calendarDays,
-                iconColor: const Color(0xFFFF6B35),
-                value: '$_daysTracked',
-                label: 'Days Tracked',
-                height: cardH,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _StatCard(
-                icon: LucideIcons.trendingUp,
-                iconColor: const Color(0xFFFF6B35),
-                value: _avgTemp > 0
-                    ? UnitService.instance.format(_avgTemp)
-                    : '--',
-                label: 'Avg Temp',
-                height: cardH,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Expanded(
-              child: _StatCard(
-                icon: LucideIcons.target,
-                iconColor: const Color(0xFFFF6B35),
-                value: '$_streak Days',
-                label: 'Streak',
-                height: cardH,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _StatCard(
-                icon: LucideIcons.award,
-                iconColor: const Color(0xFF4FC3F7),
-                value: '$_achievements',
-                label: 'Achievements',
-                height: cardH,
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-
-// ── Stat card ──────────────────────────────────────────
-class _StatCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String value;
-  final String label;
-  final double height;
-
-  const _StatCard({
-    required this.icon,
-    required this.iconColor,
-    required this.value,
-    required this.label,
-    required this.height,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final sw = MediaQuery.of(context).size.width;
-    final valueFontSize = (sw * 0.065).clamp(22.0, 30.0);
-
+  Widget _statCard(String label, String value, IconData icon) {
     return Container(
-      height: height,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F0F17),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFF1A1A26), width: 1),
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.1),
+        ),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Icon top-left
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: iconColor.withAlpha(22),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          const Spacer(),
-          // Value
+          Icon(icon, color: const Color(0xFFFF6B35), size: 24),
+          const SizedBox(height: 8),
           Text(
             value,
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white,
-              fontSize: valueFontSize,
-              fontWeight: FontWeight.w700,
-              height: 1.1,
-              letterSpacing: -0.5,
+              fontSize: 20,
+              fontWeight: FontWeight.bold,
             ),
           ),
           const SizedBox(height: 4),
-          // Label
           Text(
             label,
-            style: const TextStyle(
-              color: Color(0xFF6B7280),
-              fontSize: 13,
-              fontWeight: FontWeight.w400,
+            style: TextStyle(
+              color: Colors.grey.shade400,
+              fontSize: 12,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _actionTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback? onTap,
+    Color? iconColor,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.1),
+        ),
+      ),
+      child: ListTile(
+        onTap: onTap,
+        leading: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: (iconColor ?? const Color(0xFFFF6B35)).withOpacity(0.2),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: iconColor ?? const Color(0xFFFF6B35),
+            size: 20,
+          ),
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(
+            color: Colors.grey.shade400,
+            fontSize: 12,
+          ),
+        ),
+        trailing: onTap != null
+            ? Icon(
+                LucideIcons.chevronRight,
+                color: Colors.grey.shade600,
+                size: 20,
+              )
+            : null,
+      ),
+    );
+  }
+
+  void _showUnitPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF1E1E2E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Temperature Unit',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            ListenableBuilder(
+              listenable: UnitService.instance,
+              builder: (context, _) {
+                final us = UnitService.instance;
+                return Column(
+                  children: [
+                    _unitOption('Celsius (°C)', TempUnit.celsius, us),
+                    _unitOption('Fahrenheit (°F)', TempUnit.fahrenheit, us),
+                    _unitOption('Kelvin (K)', TempUnit.kelvin, us),
+                  ],
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _unitOption(String label, TempUnit unit, UnitService us) {
+    final isSelected = us.unit == unit;
+    return ListTile(
+      onTap: () {
+        us.setUnit(unit);
+        Navigator.pop(context);
+      },
+      leading: Icon(
+        isSelected ? LucideIcons.checkCircle2 : LucideIcons.circle,
+        color: isSelected ? const Color(0xFFFF6B35) : Colors.grey.shade600,
+      ),
+      title: Text(
+        label,
+        style: TextStyle(
+          color: isSelected ? Colors.white : Colors.grey.shade400,
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+        ),
       ),
     );
   }

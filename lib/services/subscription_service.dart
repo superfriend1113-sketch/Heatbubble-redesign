@@ -1,5 +1,8 @@
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/material.dart';
+import 'firebase_auth_service.dart';
+import 'firebase_firestore_service.dart';
 
 class SubscriptionService {
   static final SubscriptionService _instance = SubscriptionService._internal();
@@ -11,6 +14,9 @@ class SubscriptionService {
   SubscriptionService._internal();
 
   final InAppPurchase iap = InAppPurchase.instance;
+  final _auth = FirebaseAuthService();
+  final _firestore = FirebaseFirestoreService();
+  
   bool _isPremium = false;
   List<ProductDetails> _products = [];
 
@@ -97,11 +103,65 @@ class SubscriptionService {
   }
 
   /// Mark user as premium
-  Future<void> setPremium(bool value) async {
+  Future<void> setPremium(bool value, {String? purchaseId, String? productId}) async {
     _isPremium = value;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_premiumKey, value);
     await prefs.setString(_purchaseDateKey, DateTime.now().toIso8601String());
+    
+    // Sync to Firebase if user is signed in
+    if (_auth.isSignedIn) {
+      try {
+        await _firestore.saveSubscription(
+          userId: _auth.currentUser!.uid,
+          isPremium: value,
+          purchaseId: purchaseId,
+          productId: productId,
+          expiryDate: productId == monthlySubscriptionId 
+              ? DateTime.now().add(const Duration(days: 30))
+              : null,
+        );
+        debugPrint('✅ [Subscription] Synced to Firebase');
+      } catch (e) {
+        debugPrint('⚠️  [Subscription] Firebase sync failed: $e');
+        // Continue even if Firebase sync fails
+      }
+    }
+  }
+  
+  /// Sync subscription status from Firebase
+  Future<void> syncFromFirebase() async {
+    if (!_auth.isSignedIn) {
+      debugPrint('⚠️  [Subscription] Not signed in, skipping Firebase sync');
+      return;
+    }
+    
+    try {
+      debugPrint('🔄 [Subscription] Syncing from Firebase');
+      final data = await _firestore.getSubscription(_auth.currentUser!.uid);
+      
+      if (data != null) {
+        final isPremium = data['isPremium'] as bool? ?? false;
+        
+        // Check if subscription is expired (for monthly)
+        if (data['expiryDate'] != null) {
+          final expiryDate = (data['expiryDate'] as dynamic).toDate();
+          if (DateTime.now().isAfter(expiryDate)) {
+            debugPrint('⚠️  [Subscription] Subscription expired');
+            await setPremium(false);
+            return;
+          }
+        }
+        
+        _isPremium = isPremium;
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool(_premiumKey, isPremium);
+        
+        debugPrint('✅ [Subscription] Synced from Firebase: isPremium=$isPremium');
+      }
+    } catch (e) {
+      debugPrint('❌ [Subscription] Firebase sync failed: $e');
+    }
   }
 
   /// Restore purchases

@@ -8,6 +8,7 @@ import '../services/subscription_service.dart';
 import '../screens/paywall_screen.dart';
 
 /// Ad banner widget that automatically shows for free users
+/// Falls back to premium upgrade prompt if ad fails to load within 5 seconds
 class AdBannerWidget extends StatefulWidget {
   const AdBannerWidget({super.key});
 
@@ -18,6 +19,8 @@ class AdBannerWidget extends StatefulWidget {
 class _AdBannerWidgetState extends State<AdBannerWidget> {
   final _ads = AdsService();
   final _subscription = SubscriptionService();
+  bool _showFallback = false;
+  bool _adLoadTimeout = false;
 
   @override
   void initState() {
@@ -33,13 +36,16 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
       if (mounted) setState(() {});
     };
     
-    // Trigger ad load immediately for free users
-    if (!_subscription.isPremium) {
-      debugPrint('🚀 [AdBannerWidget] Triggering ad load');
-      _ads.loadBannerAd();
-    } else {
-      debugPrint('⚠️  [AdBannerWidget] Skipping ad load (premium user)');
-    }
+    // Set timeout for ad loading (5 seconds)
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted && !_ads.isAdLoaded) {
+        debugPrint('⏱️  [AdBannerWidget] Ad load timeout - showing fallback');
+        setState(() {
+          _adLoadTimeout = true;
+          _showFallback = true;
+        });
+      }
+    });
   }
 
   @override
@@ -57,18 +63,52 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
       return const SizedBox.shrink();
     }
 
+    // Show fallback if timeout or ad failed
+    if (_showFallback || (_ads.lastError != null && !_ads.isAdLoaded)) {
+      debugPrint('   - Showing premium upgrade fallback');
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: PremiumUpgradePrompt(
+          onDismiss: () {
+            setState(() => _showFallback = false);
+          },
+        ),
+      );
+    }
+
     final adWidget = _ads.getBannerAdWidget();
     if (adWidget == null) {
       debugPrint('   - No ad widget available, showing loading');
       
-      // Just show a simple loading indicator - dialog will handle errors
+      // Show minimal loading indicator
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Container(
           height: 50,
-          color: Colors.black12,
-          child: const Center(
-            child: CircularProgressIndicator(strokeWidth: 2),
+          decoration: BoxDecoration(
+            color: Colors.white.withAlpha(40),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6B35)),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Text(
+                'Loading ad...',
+                style: TextStyle(
+                  color: Colors.grey[600],
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ),
         ),
       );
@@ -78,22 +118,38 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Container(
-        color: Colors.black26,
+        decoration: BoxDecoration(
+          color: Colors.black12,
+          borderRadius: BorderRadius.circular(8),
+        ),
         child: Column(
           children: [
-            adWidget,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: adWidget,
+            ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.end,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
+                  Text(
+                    'Advertisement',
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey[600],
+                    ),
+                  ),
                   IconButton(
                     iconSize: 16,
-                    icon: const Icon(LucideIcons.x, color: Colors.grey),
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: Icon(LucideIcons.x, color: Colors.grey[600]),
                     onPressed: () {
                       _ads.trackSwipeAway();
                       setState(() {
                         _ads.disposeBannerAd();
+                        _showFallback = true;
                       });
                     },
                   ),

@@ -8,6 +8,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'services/nudge_service.dart';
 import 'services/background_service.dart';
 import 'services/unit_service.dart';
+import 'services/firebase_init_service.dart';
+import 'services/firebase_auth_service.dart';
+import 'services/subscription_service.dart';
 import 'app.dart';
 
 void main() async {
@@ -42,6 +45,17 @@ void main() async {
     // Initialize background polling
     _initializeBackgroundWork(),
   ]);
+  
+  // Initialize Firebase (optional - won't block if not configured)
+  try {
+    await FirebaseInitService().initialize();
+    
+    // Sync subscription status from Firebase if user is logged in
+    await _syncSubscriptionFromFirebase();
+  } catch (e) {
+    debugPrint('⚠️  [Init] Firebase not configured yet: $e');
+    debugPrint('   App will work without Firebase features');
+  }
 
   runApp(const HeatBubbleApp());
 }
@@ -77,4 +91,22 @@ Future<void> _initializeMobileAds() async {
 Future<void> _initializeBackgroundWork() async {
   await Workmanager().initialize(callbackDispatcher, isInDebugMode: false);
   initBackgroundPolling();
+}
+
+/// Sync subscription status from Firebase if user is logged in
+Future<void> _syncSubscriptionFromFirebase() async {
+  try {
+    final auth = FirebaseAuthService();
+    final subscription = SubscriptionService();
+    
+    if (auth.isSignedIn) {
+      debugPrint('🔄 [Init] User is logged in, syncing subscription from Firebase');
+      await subscription.syncFromFirebase();
+    } else {
+      debugPrint('ℹ️  [Init] User not logged in, using local subscription status');
+    }
+  } catch (e) {
+    debugPrint('⚠️  [Init] Failed to sync subscription: $e');
+    // Continue even if sync fails - use local data
+  }
 }

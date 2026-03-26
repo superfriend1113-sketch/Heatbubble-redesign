@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "heatbubble-cef05"
-  }
+    "default": "heatbubble-cef05",
+    "heatbubble-client": "heatbubble-9ebfa"
+  },
+  "targets": {},
+  "etags": {}
 }

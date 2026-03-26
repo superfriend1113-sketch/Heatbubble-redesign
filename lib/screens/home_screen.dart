@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../services/sensor_service.dart';
 import '../services/storage_service.dart';
 import '../services/unit_service.dart';
@@ -12,9 +11,12 @@ import '../services/nudge_service.dart';
 import '../services/comparison_service.dart';
 import '../services/subscription_service.dart';
 import '../services/ads_service.dart';
+import '../services/reading_counter_service.dart';
 import '../models/temp_reading.dart';
 import '../widgets/premium_widgets.dart';
 import '../widgets/hourly_chart_widget.dart';
+import '../widgets/ad_failure_banner.dart';
+import '../widgets/gentle_upgrade_dialog.dart';
 import '../screens/paywall_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -31,6 +33,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _comparison = ComparisonService();
   final _subscription = SubscriptionService();
   final _ads = AdsService();
+  final _readingCounter = ReadingCounterService();
 
   double _currentTemp = 0;
   double _avgTemp = 0;
@@ -38,9 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _isStable = true;
   bool _showAiBanner = true;
   Timer? _pollTimer;
-  Timer? _adCheckTimer;
-  bool _showUpgradePrompt = false;
-  bool _dialogShown = false; // Flag to prevent multiple dialogs
+  bool _showAdFailureBanner = false;
 
   // Trend
   String _trendLabel = 'Stable';
@@ -49,405 +50,47 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _initSubscription();
+    _initServices();
     _loadData();
     _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) => _loadData());
-    
-    // Continuous ad check every 3 seconds for free users
-    _adCheckTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-      debugPrint('⏰ [HomeScreen] Timer tick - checking ads...');
-      if (!_subscription.isPremium && mounted) {
-        _checkWebViewAndEnforce();
-      } else {
-        debugPrint('   - Skipping (premium: ${_subscription.isPremium}, mounted: $mounted)');
-      }
-    });
   }
 
-  Future<void> _initSubscription() async {
-    debugPrint('🚀 [HomeScreen] Initializing subscription and ads...');
+  Future<void> _initServices() async {
+    debugPrint('🚀 [HomeScreen] Initializing services...');
+    
+    // Initialize subscription
     await _subscription.init();
     debugPrint('   - Subscription initialized, isPremium: ${_subscription.isPremium}');
     
-    // Init the SDK early so it's warm when AdBannerWidget builds.
-    // AdBannerWidget itself will call loadBannerAd().
-    await _ads.init();
-    debugPrint('   - Ads initialized');
+    // Initialize reading counter
+    await _readingCounter.init();
     
-    // Check for ad loading issues immediately for free users
+    // Initialize ads for free users
     if (!_subscription.isPremium) {
-      debugPrint('   - User is FREE, setting up ad state listener');
-      // Set up listener to check when ad fails
+      await _ads.init();
+      debugPrint('   - Ads initialized');
+      
+      // Set up ad state listener BEFORE loading ad
       _ads.onAdStateChanged = () {
-        debugPrint('📢 [HomeScreen] Ad state changed!');
-        debugPrint('   - isAdLoaded: ${_ads.isAdLoaded}');
-        debugPrint('   - lastError: ${_ads.lastError}');
-        if (mounted && !_ads.isAdLoaded && _ads.lastError != null) {
-          // Ad failed to load - show dialog immediately
-          debugPrint('   - Triggering dialog from ad state change');
-          _checkWebViewAndEnforce();
+        if (mounted) {
+          setState(() {
+            // Show banner if ads fail, but don't block
+            _showAdFailureBanner = !_ads.isAdLoaded && _ads.lastError != null;
+          });
         }
       };
-    } else {
-      debugPrint('   - User is PREMIUM, skipping ad setup');
+      
+      // Load the banner ad
+      await _ads.loadBannerAd();
+      debugPrint('   - Banner ad load initiated');
     }
   }
 
   @override
   void dispose() {
     _pollTimer?.cancel();
-    _adCheckTimer?.cancel();
     _ads.disposeBannerAd();
     super.dispose();
-  }
-
-  void _checkWebViewAndEnforce() {
-    debugPrint('🔍 [HomeScreen] _checkWebViewAndEnforce called');
-    debugPrint('   - mounted: $mounted');
-    debugPrint('   - isPremium: ${_subscription.isPremium}');
-    debugPrint('   - _dialogShown: $_dialogShown');
-    debugPrint('   - _ads.lastError: ${_ads.lastError}');
-    debugPrint('   - _ads.isAdLoaded: ${_ads.isAdLoaded}');
-    
-    if (!mounted || _subscription.isPremium || _dialogShown) {
-      debugPrint('   ❌ Skipping dialog (conditions not met)');
-      return;
-    }
-    
-    // Check if ad failed to load
-    final hasError = _ads.lastError != null && !_ads.isAdLoaded;
-    debugPrint('   - hasError: $hasError');
-    
-    if (hasError) {
-      debugPrint('   ✅ Showing dialog!');
-      // Set flag to prevent multiple dialogs
-      _dialogShown = true;
-      
-      // Show blocking dialog immediately - user must choose
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        barrierColor: Colors.black87,
-        builder: (context) => WillPopScope(
-          onWillPop: () async => false, // Prevent back button
-          child: Dialog(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            child: Container(
-              padding: const EdgeInsets.all(24),
-              decoration: BoxDecoration(
-                color: const Color(0xFF1E1E2E),
-                borderRadius: BorderRadius.circular(20),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
-                    blurRadius: 20,
-                    offset: const Offset(0, 10),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Icon
-                  Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.shade700.withOpacity(0.2),
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: Colors.orange.shade700.withOpacity(0.3),
-                        width: 2,
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.warning_rounded,
-                      color: Colors.orange.shade400,
-                      size: 48,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Title
-                  const Text(
-                    'Ads Required',
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  // Message
-                  Text(
-                    'The free version requires ads to be displayed.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade300,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Ads cannot load on your device. Please choose an option below:',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey.shade400,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                  
-                  // Divider
-                  Container(
-                    height: 1,
-                    color: Colors.grey.shade800,
-                  ),
-                  const SizedBox(height: 20),
-                  
-                  // Upgrade to Premium Button (Primary)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        Navigator.pop(context);
-                        
-                        // Pause ad checking while paywall is open
-                        _adCheckTimer?.cancel();
-                        
-                        // Show paywall and wait for result
-                        await showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          isDismissible: false,
-                          builder: (context) => const PaywallScreen(),
-                        );
-                        
-                        // After paywall closes, check if user upgraded
-                        if (mounted) {
-                          await _subscription.init(); // Refresh subscription status
-                          
-                          if (_subscription.isPremium) {
-                            // User upgraded! Reset flag and don't restart timer
-                            _dialogShown = false;
-                            setState(() {}); // Rebuild to hide ads
-                          } else {
-                            // User didn't upgrade, restart ad checking
-                            _dialogShown = false;
-                            _adCheckTimer = Timer.periodic(const Duration(seconds: 3), (_) {
-                              if (!_subscription.isPremium && mounted) {
-                                _checkWebViewAndEnforce();
-                              }
-                            });
-                          }
-                        }
-                      },
-                      icon: const Icon(Icons.star_rounded, size: 20),
-                      label: const Text(
-                        'Upgrade to Premium',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFFFF6B35),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  // Enable Ads Button (Install WebView)
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        // Open Play Store to WebView
-                        final webViewUrl = Uri.parse('market://details?id=com.google.android.webview');
-                        final webViewHttpUrl = Uri.parse('https://play.google.com/store/apps/details?id=com.google.android.webview');
-                        
-                        bool opened = false;
-                        if (await canLaunchUrl(webViewUrl)) {
-                          opened = await launchUrl(webViewUrl, mode: LaunchMode.externalApplication);
-                        }
-                        if (!opened && await canLaunchUrl(webViewHttpUrl)) {
-                          opened = await launchUrl(webViewHttpUrl, mode: LaunchMode.externalApplication);
-                        }
-                        
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                          // Don't reset flag - keep it shown
-                          // Show restart message
-                          _showRestartDialog();
-                        }
-                      },
-                      icon: const Icon(Icons.download_rounded, size: 20),
-                      label: const Text(
-                        'Enable Ads',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: const Color(0xFF1E1E2E),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        elevation: 0,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  
-                  // Exit App Button
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        SystemNavigator.pop();
-                      },
-                      icon: const Icon(Icons.exit_to_app_rounded, size: 20),
-                      label: const Text(
-                        'Exit App',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.grey.shade300,
-                        side: BorderSide(color: Colors.grey.shade700),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ).then((_) {
-        // If dialog is dismissed somehow, reset flag so it can show again
-        if (mounted && !_subscription.isPremium && _ads.lastError != null) {
-          _dialogShown = false;
-        }
-      });
-    }
-  }
-  
-  void _showRestartDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      barrierColor: Colors.black87,
-      builder: (context) => WillPopScope(
-        onWillPop: () async => false, // Prevent back button
-        child: Dialog(
-          backgroundColor: Colors.transparent,
-          elevation: 0,
-          child: Container(
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.3),
-                  blurRadius: 20,
-                  offset: const Offset(0, 10),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Success Icon
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.green.shade50,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.green.shade200,
-                      width: 2,
-                    ),
-                  ),
-                  child: Icon(
-                    Icons.check_circle_rounded,
-                    color: Colors.green.shade600,
-                    size: 48,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                
-                // Title
-                const Text(
-                  'Restart Required',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Color(0xFF1E1E2E),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                
-                // Message
-                Text(
-                  'After installing WebView from Play Store, please restart the app to see ads.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade700,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                
-                // Close Button
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () => SystemNavigator.pop(),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1E1E2E),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: const Text(
-                      'Close App',
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   Future<void> _loadData() async {
@@ -461,6 +104,26 @@ class _HomeScreenState extends State<HomeScreen> {
           rawTemp: result.raw,
           timestamp: DateTime.now(),
         ));
+        
+        // Increment reading counter for free users
+        if (!_subscription.isPremium) {
+          await _readingCounter.increment();
+          
+          // Check if we should show gentle upgrade prompt
+          if (_readingCounter.shouldShowUpgradePrompt() && mounted) {
+            await _readingCounter.markPromptShown();
+            
+            // Show gentle, dismissible prompt
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted) {
+                showDialog(
+                  context: context,
+                  builder: (context) => const GentleUpgradeDialog(),
+                );
+              }
+            });
+          }
+        }
       }
 
       final avg = await _storage.getSevenDayAverage();
@@ -776,8 +439,16 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 20),
 
+            // ── Ad Failure Banner (non-blocking) ──
+            if (!_subscription.isPremium && _showAdFailureBanner)
+              AdFailureBanner(
+                onDismiss: () {
+                  setState(() => _showAdFailureBanner = false);
+                },
+              ),
+
             // ── Ad Banner for free users (at bottom) ──
-            if (!_subscription.isPremium)
+            if (!_subscription.isPremium && !_showAdFailureBanner)
               const AdBannerWidget(),
           ],
         );
