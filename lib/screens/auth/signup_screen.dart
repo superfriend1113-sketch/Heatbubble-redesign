@@ -61,7 +61,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Account created successfully!'),
+              content: Text(
+                'Account created successfully!',
+                style: TextStyle(color: Colors.white),
+              ),
               backgroundColor: Colors.green,
             ),
           );
@@ -72,7 +75,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_auth.getErrorMessage(e)),
+            content: Text(
+              _auth.getErrorMessage(e),
+              style: const TextStyle(color: Colors.white),
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -81,7 +87,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to create account: $e'),
+            content: Text(
+              'Failed to create account: $e',
+              style: const TextStyle(color: Colors.white),
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -120,7 +129,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Signed in with Google successfully!'),
+              content: Text(
+                'Signed in with Google successfully!',
+                style: TextStyle(color: Colors.white),
+              ),
               backgroundColor: Colors.green,
             ),
           );
@@ -131,7 +143,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(_auth.getErrorMessage(e)),
+            content: Text(
+              _auth.getErrorMessage(e),
+              style: const TextStyle(color: Colors.white),
+            ),
             backgroundColor: Colors.red,
           ),
         );
@@ -140,7 +155,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to sign in with Google: $e'),
+            content: Text(
+              'Failed to sign in with Google: $e',
+              style: const TextStyle(color: Colors.white),
+            ),
             backgroundColor: Colors.red,
           ),
         );

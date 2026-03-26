@@ -47,17 +47,14 @@ service cloud.firestore {
     }
     
     // Subscriptions collection
-    // Users can read their own subscription status
-    // Only backend/admin can write (for security)
+    // Users can read and write their own subscription status
     match /subscriptions/{userId} {
       allow read: if isOwner(userId);
-      allow write: if false; // Only backend can write subscription data
-      
-      // If you want to allow app to write (less secure but simpler):
-      // allow create, update: if isOwner(userId) && 
-      //                          request.resource.data.keys().hasAll(['userId', 'isPremium', 'updatedAt']) &&
-      //                          request.resource.data.userId == userId &&
-      //                          request.resource.data.updatedAt == request.time;
+      allow create, update: if isOwner(userId) && 
+                               request.resource.data.keys().hasAll(['userId', 'isPremium', 'updatedAt']) &&
+                               request.resource.data.userId == userId &&
+                               request.resource.data.updatedAt == request.time;
+      allow delete: if false; // Prevent accidental deletion
     }
     
     // Analytics collection (optional - for tracking app usage)

@@ -32,7 +32,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Purchase failed: $e')),
+          SnackBar(
+            content: Text(
+              'Purchase failed: $e',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {
@@ -53,7 +59,13 @@ class _PaywallScreenState extends State<PaywallScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Purchase failed: $e')),
+          SnackBar(
+            content: Text(
+              'Purchase failed: $e',
+              style: const TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.red,
+          ),
         );
       }
     } finally {

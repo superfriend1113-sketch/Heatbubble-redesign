@@ -36,7 +36,13 @@ class _CustomAlertsScreenState extends State<CustomAlertsScreen> {
   void _showAddAlertDialog() {
     if (!_subscription.isPremium) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Premium feature - upgrade to use custom alerts')),
+        const SnackBar(
+          content: Text(
+            'Premium feature - upgrade to use custom alerts',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Colors.orange,
+        ),
       );
       return;
     }
@@ -378,7 +384,13 @@ class _AddAlertDialogState extends State<_AddAlertDialog> {
           onPressed: () {
             if (_nameController.text.isEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Please enter alert name')),
+                const SnackBar(
+                  content: Text(
+                    'Please enter alert name',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  backgroundColor: Colors.orange,
+                ),
               );
               return;
             }

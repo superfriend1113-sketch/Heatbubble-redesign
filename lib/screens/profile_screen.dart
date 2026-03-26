@@ -199,7 +199,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(
+          message,
+          style: const TextStyle(color: Colors.white),
+        ),
         backgroundColor: isError ? Colors.red : Colors.green,
       ),
     );
