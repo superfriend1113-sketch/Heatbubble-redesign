@@ -20,12 +20,14 @@ class NudgeService {
     const settings = InitializationSettings(android: android);
     await _plugin.initialize(settings);
 
-    // ── Standard alerts channel (existing) ──
+    // ── Standard alerts channel (high priority for pop-up) ──
     const standardChannel = AndroidNotificationChannel(
       'heatbubble_alerts',
       'Temperature Alerts',
       description: 'Notifies when your pocket temperature is unusual.',
-      importance: Importance.defaultImportance,
+      importance: Importance.high,
+      playSound: true,
+      enableVibration: true,
     );
 
     // ── Extreme alerts channel v2 — max priority, bypasses cache ──
@@ -153,9 +155,11 @@ class NudgeService {
         'heatbubble_alerts',
         'Temperature Alerts',
         channelDescription: 'Notifies when your pocket temp is unusual.',
-        importance: Importance.defaultImportance,
-        priority: Priority.defaultPriority,
+        importance: Importance.high,
+        priority: Priority.high,
         icon: '@mipmap/ic_launcher',
+        playSound: true,
+        enableVibration: true,
       ),
     );
     await _plugin.show(1001, 'HeatBubble', body, details);
@@ -171,9 +175,11 @@ class NudgeService {
         'heatbubble_alerts',
         'Temperature Alerts',
         channelDescription: 'Notifies when your pocket temp is unusual.',
-        importance: Importance.defaultImportance,
-        priority: Priority.defaultPriority,
+        importance: Importance.high,
+        priority: Priority.high,
         icon: '@mipmap/ic_launcher',
+        playSound: true,
+        enableVibration: true,
       ),
     );
     // Use a unique ID based on time
