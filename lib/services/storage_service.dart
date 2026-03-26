@@ -129,6 +129,16 @@ class StorageService {
     return isar.tempReadings.count();
   }
 
+  /// Get all readings (use with caution - can be large dataset)
+  /// For smart sync aggregation only
+  Future<List<TempReading>> getAllReadings() async {
+    final isar = await db;
+    return isar.tempReadings
+        .where()
+        .sortByTimestamp()
+        .findAll();
+  }
+
   /// Count distinct calendar days that have at least one reading
   /// Optimized: Uses aggregation instead of loading all readings
   Future<int> getUniqueDaysCount() async {
