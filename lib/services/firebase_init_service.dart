@@ -2,12 +2,18 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'firebase_auth_service.dart';
+import 'notification_service.dart';
 
 /// Background message handler (must be top-level function)
+/// Called when app is killed/terminated
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  debugPrint('📬 [FCM] Background message: ${message.messageId}');
+  
+  // Initialize notification service for background handling
+  final notificationService = NotificationService();
+  await notificationService.initialize();
+  await notificationService.handleRemoteMessage(message);
 }
 
 class FirebaseInitService {
@@ -87,11 +93,15 @@ class FirebaseInitService {
         badge: true,
         sound: true,
         provisional: false,
+        announcement: true,
+        carPlay: false,
+        criticalAlert: false,
       );
 
       debugPrint('📬 [FCM] Permission status: ${settings.authorizationStatus}');
 
-      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      if (settings.authorizationStatus == AuthorizationStatus.authorized ||
+          settings.authorizationStatus == AuthorizationStatus.provisional) {
         // Get FCM token
         _fcmToken = await messaging.getToken();
         debugPrint('📬 [FCM] Token: $_fcmToken');
@@ -100,25 +110,39 @@ class FirebaseInitService {
         messaging.onTokenRefresh.listen((newToken) {
           _fcmToken = newToken;
           debugPrint('📬 [FCM] Token refreshed: $newToken');
-          // TODO: Send token to your backend
+          // Send to your backend to update device token
+          _sendTokenToBackend(newToken);
         });
 
         // Set up message handlers
         FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
+        // Initialize notification service
+        final notificationService = NotificationService();
+        await notificationService.initialize();
+
         // Handle foreground messages
         FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-          debugPrint('📬 [FCM] Foreground message: ${message.messageId}');
-          debugPrint('   Title: ${message.notification?.title}');
-          debugPrint('   Body: ${message.notification?.body}');
-          // TODO: Show local notification
+          debugPrint('📬 [FCM] Foreground message received: ${message.messageId}');
+          notificationService.handleForegroundMessage(message);
         });
 
-        // Handle notification tap (app opened from notification)
+        // Handle notification tap (app opened from notification or resumed)
         FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
           debugPrint('📬 [FCM] Notification tapped: ${message.messageId}');
-          // TODO: Navigate to specific screen
+          notificationService.handleInitialMessage(message);
         });
+
+        // Handle initial message (app launched from notification)
+        final initialMessage = await messaging.getInitialMessage();
+        if (initialMessage != null) {
+          debugPrint('📬 [FCM] App launched from notification');
+          notificationService.handleInitialMessage(initialMessage);
+        }
+
+        // Subscribe to default topics for broadcast notifications
+        await messaging.subscribeToTopic('all_users');
+        debugPrint('✅ [FCM] Subscribed to all_users topic');
 
         debugPrint('✅ [FCM] Cloud Messaging initialized');
       } else {
@@ -139,11 +163,27 @@ class FirebaseInitService {
         debugPrint('👤 [Auth] User signed in: ${user.uid}');
         debugPrint('   Email: ${user.email}');
         debugPrint('   Display Name: ${user.displayName}');
-        // TODO: Sync user data, subscription status, etc.
       } else {
         debugPrint('👤 [Auth] User signed out');
       }
     });
+  }
+
+  /// Internal method to send token to backend
+  Future<void> _sendTokenToBackend(String token) async {
+    try {
+      debugPrint('📤 [FCM] Token: ${token.substring(0, 20)}...');
+      // TODO: Implement your backend API call here
+      // Example:
+      // await http.post(
+      //   Uri.parse('https://your-backend.com/api/fcm-token'),
+      //   headers: {'Content-Type': 'application/json'},
+      //   body: jsonEncode({'token': token, 'platform': 'android'}),
+      // );
+      debugPrint('✅ [FCM] Token processed');
+    } catch (e) {
+      debugPrint('❌ [FCM] Failed to process token: $e');
+    }
   }
 
   /// Send FCM token to backend (for push notifications)
@@ -154,14 +194,9 @@ class FirebaseInitService {
     }
 
     try {
-      debugPrint('📤 [FCM] Sending token to backend for user: $userId');
-      // TODO: Implement your backend API call
-      // Example:
-      // await http.post(
-      //   Uri.parse('https://your-backend.com/api/fcm-token'),
-      //   body: {'userId': userId, 'token': _fcmToken},
-      // );
-      debugPrint('✅ [FCM] Token sent to backend');
+      debugPrint('📤 [FCM] Sending token for user: $userId');
+      await _sendTokenToBackend(_fcmToken!);
+      debugPrint('✅ [FCM] Token sent');
     } catch (e) {
       debugPrint('❌ [FCM] Failed to send token: $e');
     }
