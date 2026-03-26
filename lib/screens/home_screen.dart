@@ -8,6 +8,7 @@ import '../services/subscription_service.dart';
 import '../services/ads_service.dart';
 import '../services/reading_counter_service.dart';
 import '../services/smart_sync_service.dart';
+import '../services/home_widget_service.dart';
 import '../models/temp_reading.dart';
 import '../widgets/premium_widgets.dart';
 import '../widgets/ad_failure_banner.dart';
@@ -27,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final _ads = AdsService();
   final _readingCounter = ReadingCounterService();
   final _smartSync = SmartSyncService();
+  final _homeWidget = HomeWidgetService();
 
   double _currentTemp = 0;
   double _avgTemp = 0;
@@ -156,6 +158,12 @@ class _HomeScreenState extends State<HomeScreen> {
           _variance = variance;
           _trendLabel = trend;
         });
+        // Push data to device home screen widget
+        _homeWidget.updateWidget(
+          temperature: temp,
+          trend: trend,
+          unit: UnitService.instance.unit,
+        );
       }
     } catch (_) {}
   }
@@ -434,6 +442,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 20),
 
+            // ── Home Screen Widget promo card ──
+            _HomeWidgetPromoCard(
+              isPremium: _subscription.isPremium,
+              currentTemp: _currentTemp,
+              trendLabel: _trendLabel,
+            ),
+
+            const SizedBox(height: 20),
+
             // ── Ad Failure Banner (non-blocking) ──
             if (!_subscription.isPremium && _showAdFailureBanner)
               AdFailureBanner(
@@ -542,6 +559,265 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Home Screen Widget Promo Card
+// Shows instructions to add the widget; premium-gated with dev bypass.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Set to true during development so you can see the widget banner and test the
+/// feature without purchasing premium. Flip to false before releasing.
+const bool kDevHomeWidgetBypass = true;
+
+class _HomeWidgetPromoCard extends StatelessWidget {
+  final bool isPremium;
+  final double currentTemp;
+  final String trendLabel;
+
+  const _HomeWidgetPromoCard({
+    required this.isPremium,
+    required this.currentTemp,
+    required this.trendLabel,
+  });
+
+  bool get _canSee => kDevHomeWidgetBypass || isPremium;
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_canSee) return const SizedBox.shrink();
+
+    final isAlert = trendLabel == 'Rising' && currentTemp > 37.5;
+    final statusColor =
+        isAlert ? const Color(0xFFFF4E50) : const Color(0xFF10B981);
+    final statusIcon =
+        isAlert ? Icons.warning_amber_rounded : Icons.check_circle;
+
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.white.withAlpha(200),
+            Colors.white.withAlpha(160),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withAlpha(220), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withAlpha(15),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header row
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF6B35), Color(0xFFFF8E53)],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.widgets_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Home Screen Widget',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                    if (kDevHomeWidgetBypass && !isPremium)
+                      Container(
+                        margin: const EdgeInsets.only(top: 3),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withAlpha(25),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                              color: const Color(0xFF10B981).withAlpha(70)),
+                        ),
+                        child: const Text(
+                          '🛠  Dev Mode',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: Color(0xFF10B981),
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 14),
+
+          // Mini widget preview
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFFFF6B35), Color(0xFFFF8E53)],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFFFF6B35).withAlpha(60),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'HeatBubble',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w500,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      currentTemp > 0
+                          ? UnitService.instance.format(currentTemp)
+                          : '--°',
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.0,
+                        letterSpacing: -1,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      trendLabel,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.white70,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withAlpha(40),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    statusIcon,
+                    color: statusColor == const Color(0xFFFF4E50)
+                        ? Colors.white
+                        : Colors.white,
+                    size: 24,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 14),
+
+          // Step-by-step instructions
+          const Text(
+            'How to add to your home screen:',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFF374151),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _Step(
+              n: '1',
+              text: 'Long-press an empty area on your home screen'),
+          const SizedBox(height: 5),
+          _Step(n: '2', text: 'Tap Widgets'),
+          const SizedBox(height: 5),
+          _Step(n: '3', text: 'Search for \'HeatBubble\' and tap & hold it'),
+          const SizedBox(height: 5),
+          _Step(n: '4', text: 'Drop it on your home screen'),
+        ],
+      ),
+    );
+  }
+}
+
+class _Step extends StatelessWidget {
+  final String n;
+  final String text;
+  const _Step({required this.n, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 20,
+          height: 20,
+          decoration: BoxDecoration(
+            color: const Color(0xFFFF6B35).withAlpha(25),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              n,
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFFFF6B35),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              color: const Color(0xFF374151).withAlpha(200),
+              height: 1.3,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

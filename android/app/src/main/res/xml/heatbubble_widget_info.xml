@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Minimal AppWidgetProviderInfo — only attributes available on API 21+.
+  Removed targetCellWidth/targetCellHeight (API 31+) and description (API 31+)
+  as MIUI/older launchers can silently reject the entire XML if they encounter
+  unrecognised attributes in appwidget-provider.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="180dp"
+    android:minHeight="100dp"
+    android:updatePeriodMillis="1800000"
+    android:initialLayout="@layout/heatbubble_widget"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:previewImage="@mipmap/ic_launcher" />

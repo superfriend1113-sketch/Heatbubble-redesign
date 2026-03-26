@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SAMSUNG ONE UI WIDGET RULES (learned the hard way):
+  - Root ViewGroup must be LinearLayout with orientation=vertical
+  - Do NOT nest any additional ViewGroups inside — Samsung's RemoteViews inflater
+    silently rejects nested LinearLayouts and causes "Can't load widget"
+  - Do NOT use plain <View> tags (not on the RemoteViews whitelist on Samsung)
+  - Only TextView children allowed at the top level
+  - Background must be an inline hex color — no @drawable references
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#FFFF6B35"
+    android:paddingLeft="16dp"
+    android:paddingRight="16dp"
+    android:paddingTop="14dp"
+    android:paddingBottom="14dp"
+    android:gravity="center_vertical">
+
+    <!-- App branding -->
+    <TextView
+        android:id="@+id/widget_app_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="HeatBubble"
+        android:textColor="#CCFFFFFF"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+
+    <!-- Big temperature reading -->
+    <TextView
+        android:id="@+id/widget_temperature"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="--"
+        android:textColor="#FFFFFF"
+        android:textSize="40sp"
+        android:textStyle="bold" />
+
+    <!-- Trend: "^ Rising", "v Falling", "- Stable" -->
+    <TextView
+        android:id="@+id/widget_trend"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="- Stable"
+        android:textColor="#DDFFFFFF"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+    <!-- Status label: Normal / Warm / Elevated / Fever Alert -->
+    <TextView
+        android:id="@+id/widget_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="Normal"
+        android:textColor="#BBFFFFFF"
+        android:textSize="11sp" />
+
+    <!-- Last updated time, right-aligned -->
+    <TextView
+        android:id="@+id/widget_updated"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text=""
+        android:textColor="#88FFFFFF"
+        android:textSize="10sp"
+        android:gravity="end" />
+
+    <!-- Alert bar — visible only when temp rising and > 37.5 -->
+    <TextView
+        android:id="@+id/widget_alert"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="5dp"
+        android:text="! Temperature Rising Fast"
+        android:textColor="#FFFFFF"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:visibility="gone" />
+
+</LinearLayout>

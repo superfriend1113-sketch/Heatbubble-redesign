@@ -11,6 +11,7 @@ import 'services/unit_service.dart';
 import 'services/firebase_init_service.dart';
 import 'services/firebase_auth_service.dart';
 import 'services/subscription_service.dart';
+import 'services/home_widget_service.dart';
 import 'app.dart';
 
 void main() async {
@@ -44,6 +45,8 @@ void main() async {
     Permission.notification.request(),
     // Initialize background polling
     _initializeBackgroundWork(),
+    // Initialize home screen widget
+    HomeWidgetService.init(),
   ]);
   
   // Initialize Firebase (optional - won't block if not configured)
