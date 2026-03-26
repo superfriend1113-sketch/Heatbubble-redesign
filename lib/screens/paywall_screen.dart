@@ -297,7 +297,7 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
                       ),
                       const SizedBox(height: 16),
                       _buildFeatureItem(
-                        LucideIcons.barChart2,
+                        LucideIcons.trendingUp,
                         'Advanced Analytics',
                         'Deep insights into your temperature data',
                       ),
