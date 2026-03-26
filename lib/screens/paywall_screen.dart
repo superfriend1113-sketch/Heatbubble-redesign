@@ -273,7 +273,7 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
 
                       // Features list
                       _buildFeatureItem(
-                        LucideIcons.lineChart,
+                        LucideIcons.activity,
                         'Hourly Temperature Charts',
                         'Track temperature trends hour by hour',
                       ),
@@ -297,7 +297,7 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
                       ),
                       const SizedBox(height: 16),
                       _buildFeatureItem(
-                        LucideIcons.barChart,
+                        LucideIcons.barChart2,
                         'Advanced Analytics',
                         'Deep insights into your temperature data',
                       ),
