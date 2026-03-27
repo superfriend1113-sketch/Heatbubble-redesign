@@ -158,11 +158,13 @@ class _HomeScreenState extends State<HomeScreen> {
           _variance = variance;
           _trendLabel = trend;
         });
-        // Push data to device home screen widget
+        // Push data to device home screen widget.
+        // isPremium: also allow dev bypass so testing works without a subscription.
         _homeWidget.updateWidget(
           temperature: temp,
           trend: trend,
           unit: UnitService.instance.unit,
+          isPremium: _subscription.isPremium || kDevHomeWidgetBypass,
         );
       }
     } catch (_) {}

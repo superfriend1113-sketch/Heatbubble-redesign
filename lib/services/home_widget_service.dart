@@ -11,50 +11,52 @@ import 'unit_service.dart';
 ///   hw_alert        → "true" | "false"
 ///   hw_updated      → "18:32"
 ///   hw_status       → "Normal" | "Warm" | "Elevated" | "Fever Alert"
+///   hw_is_premium   → "true" | "false"  ← gates widget content on the native side
 class HomeWidgetService {
   static const String _appGroupId        = 'group.com.example.heatbubble';
   static const String _androidWidgetName = 'HeatBubbleWidget';
 
-  static const String _keyTemp    = 'hw_temperature';
-  static const String _keyTrend   = 'hw_trend';
-  static const String _keyAlert   = 'hw_alert';
-  static const String _keyUpdated = 'hw_updated';
-  static const String _keyStatus  = 'hw_status';
+  static const String _keyTemp      = 'hw_temperature';
+  static const String _keyTrend     = 'hw_trend';
+  static const String _keyAlert     = 'hw_alert';
+  static const String _keyUpdated   = 'hw_updated';
+  static const String _keyStatus    = 'hw_status';
+  static const String _keyIsPremium = 'hw_is_premium';
 
   /// Saves temperature data and triggers an Android widget refresh.
+  /// [isPremium] controls whether the widget shows temp data or a lock screen.
   Future<void> updateWidget({
     required double temperature,
     required String trend,
     required TempUnit unit,
+    required bool isPremium,
   }) async {
     try {
       final formatted = temperature > 0
           ? UnitService.instance.format(temperature)
           : '--';
-      final isAlert   = trend == 'Rising' && temperature > 37.5;
-      final status    = _statusLabel(temperature);
-      final now       = _timeString();
+      final isAlert = isPremium && trend == 'Rising' && temperature > 37.5;
+      final status  = isPremium ? _statusLabel(temperature) : 'Premium';
+      final now     = _timeString();
 
-      await HomeWidget.saveWidgetData<String>(_keyTemp,    formatted);
-      await HomeWidget.saveWidgetData<String>(_keyTrend,   trend);
-      await HomeWidget.saveWidgetData<String>(_keyAlert,   isAlert.toString());
-      await HomeWidget.saveWidgetData<String>(_keyUpdated, now);
-      await HomeWidget.saveWidgetData<String>(_keyStatus,  status);
+      await HomeWidget.saveWidgetData<String>(_keyTemp,      formatted);
+      await HomeWidget.saveWidgetData<String>(_keyTrend,     trend);
+      await HomeWidget.saveWidgetData<String>(_keyAlert,     isAlert.toString());
+      await HomeWidget.saveWidgetData<String>(_keyUpdated,   now);
+      await HomeWidget.saveWidgetData<String>(_keyStatus,    status);
+      await HomeWidget.saveWidgetData<String>(_keyIsPremium, isPremium.toString());
 
       await HomeWidget.updateWidget(
         androidName: _androidWidgetName,
         qualifiedAndroidName: 'com.example.heatbubble.$_androidWidgetName',
       );
 
-      debugPrint(
-        '📱 [HomeWidget] $formatted | $trend | $status | alert=$isAlert',
-      );
+      debugPrint('📱 [HomeWidget] $formatted | $trend | $status | premium=$isPremium');
     } catch (e) {
       debugPrint('⚠️  [HomeWidget] updateWidget failed: $e');
     }
   }
 
-  /// Returns a human-readable status label based on temperature (°C equivalent).
   String _statusLabel(double tempC) {
     if (tempC <= 0)   return 'No data';
     if (tempC < 34.0) return 'Cool';
@@ -64,7 +66,6 @@ class HomeWidgetService {
     return 'Fever Alert';
   }
 
-  /// Call once at app startup.
   static Future<void> init() async {
     try {
       await HomeWidget.setAppGroupId(_appGroupId);

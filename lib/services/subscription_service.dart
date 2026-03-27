@@ -4,112 +4,149 @@ import 'package:flutter/material.dart';
 import 'firebase_auth_service.dart';
 import 'firebase_firestore_service.dart';
 
+/// Manages the HeatBubble subscription state.
+///
+/// Subscription model:
+///   • Monthly  — $1.99/month  — auto-renews monthly
+///   • Annual   — $19.99/year  — auto-renews every 12 months
+///   Both plans include a **7-day free trial** for first-time subscribers
+///   (enforced by Google Play; no code change needed).
 class SubscriptionService {
   static final SubscriptionService _instance = SubscriptionService._internal();
-
-  factory SubscriptionService() {
-    return _instance;
-  }
-
+  factory SubscriptionService() => _instance;
   SubscriptionService._internal();
 
   final InAppPurchase iap = InAppPurchase.instance;
-  final _auth = FirebaseAuthService();
+  final _auth      = FirebaseAuthService();
   final _firestore = FirebaseFirestoreService();
-  
+
   bool _isPremium = false;
   List<ProductDetails> _products = [];
 
-  // Product IDs
-  static const String oneTimePurchaseId = 'heatbubble_premium_onetime';
-  static const String monthlySubscriptionId = 'heatbubble_premium_monthly';
+  // ── Product IDs (must match Play Console exactly) ──────────────────────
+  static const String monthlySubscriptionId = 'heatbubble_premium_monthly'; // $1.99/mo
+  static const String annualSubscriptionId  = 'heatbubble_premium_annual';  // $19.99/yr
 
-  // Keys
-  static const String _premiumKey = 'is_premium';
+  static const Set<String> _allProductIds = {
+    monthlySubscriptionId,
+    annualSubscriptionId,
+  };
+
+  // ── Expiry durations ────────────────────────────────────────────────────
+  static const Duration _monthlyDuration = Duration(days: 31);
+  static const Duration _annualDuration  = Duration(days: 366);
+
+  // ── SharedPreferences keys ──────────────────────────────────────────────
+  static const String _premiumKey      = 'is_premium';
   static const String _purchaseDateKey = 'premium_purchase_date';
+  static const String _productIdKey    = 'premium_product_id';
+  static const String _expiryKey       = 'premium_expiry_date';
 
   bool get isPremium => _isPremium;
   List<ProductDetails> get products => _products;
 
-  /// Initialize subscription service
+  ProductDetails? get monthlyProduct =>
+      _products.where((p) => p.id == monthlySubscriptionId).firstOrNull;
+
+  ProductDetails? get annualProduct =>
+      _products.where((p) => p.id == annualSubscriptionId).firstOrNull;
+
+  // ── Initialise ──────────────────────────────────────────────────────────
+
   Future<void> init() async {
     await _loadPremiumStatus();
     await _initializeProducts();
   }
 
-  /// Load premium status from persistent storage
   Future<void> _loadPremiumStatus() async {
     final prefs = await SharedPreferences.getInstance();
     _isPremium = prefs.getBool(_premiumKey) ?? false;
+
+    // Validate locally-cached expiry (belt-and-suspenders; Play handles renewal)
+    final expiryStr = prefs.getString(_expiryKey);
+    if (expiryStr != null) {
+      final expiry = DateTime.tryParse(expiryStr);
+      if (expiry != null && DateTime.now().isAfter(expiry)) {
+        debugPrint('⚠️  [Subscription] Local cache expired — resetting premium');
+        _isPremium = false;
+        await prefs.setBool(_premiumKey, false);
+      }
+    }
   }
 
-  /// Initialize available products
   Future<void> _initializeProducts() async {
     final bool available = await iap.isAvailable();
-
     if (!available) {
-      debugPrint('In-App Purchase not available');
+      debugPrint('⚠️  [Subscription] In-App Purchase not available on this device');
       return;
     }
 
-    // Fetch product details
-    const Set<String> ids = {
-      oneTimePurchaseId,
-      monthlySubscriptionId,
-    };
-
     try {
-      final ProductDetailsResponse response = await iap.queryProductDetails(ids);
-
+      final ProductDetailsResponse response =
+          await iap.queryProductDetails(_allProductIds);
       _products = response.productDetails;
-      debugPrint('Products loaded: ${_products.length}');
+      debugPrint('✅ [Subscription] Products loaded: ${_products.map((p) => p.id).toList()}');
+      if (response.notFoundIDs.isNotEmpty) {
+        debugPrint('⚠️  [Subscription] Not found in Play Console: ${response.notFoundIDs}');
+      }
     } catch (e) {
-      debugPrint('Error loading products: $e');
+      debugPrint('❌ [Subscription] Error loading products: $e');
     }
   }
 
-  /// Purchase one-time premium ($2.99)
-  Future<bool> purchaseOneTime() async {
-    final product = _products.firstWhere(
-      (p) => p.id == oneTimePurchaseId,
-      orElse: () => throw Exception('Product not found'),
-    );
+  // ── Purchase methods ────────────────────────────────────────────────────
 
+  /// Start the monthly subscription flow ($1.99/month, 7-day trial for new users).
+  Future<bool> purchaseMonthly() async => _startSubscription(monthlySubscriptionId);
+
+  /// Start the annual subscription flow ($19.99/year, 7-day trial for new users).
+  Future<bool> purchaseAnnual() async => _startSubscription(annualSubscriptionId);
+
+  Future<bool> _startSubscription(String productId) async {
+    final product = _products.where((p) => p.id == productId).firstOrNull;
+    if (product == null) {
+      debugPrint('❌ [Subscription] Product not found: $productId');
+      return false;
+    }
     try {
-      final PurchaseParam purchaseParam = PurchaseParam(productDetails: product);
-      await iap.buyNonConsumable(purchaseParam: purchaseParam);
+      // Subscriptions use buyNonConsumable (they are not consumed)
+      final PurchaseParam param = PurchaseParam(productDetails: product);
+      await iap.buyNonConsumable(purchaseParam: param);
       return true;
     } catch (e) {
-      debugPrint('Purchase error: $e');
+      debugPrint('❌ [Subscription] Purchase error: $e');
       return false;
     }
   }
 
-  /// Purchase monthly subscription ($1.99/month)
-  Future<bool> purchaseMonthly() async {
-    final product = _products.firstWhere(
-      (p) => p.id == monthlySubscriptionId,
-      orElse: () => throw Exception('Product not found'),
-    );
+  // ── Premium status management ───────────────────────────────────────────
 
-    try {
-      final PurchaseParam purchaseParam = PurchaseParam(productDetails: product);
-      await iap.buyConsumable(purchaseParam: purchaseParam);
-      return true;
-    } catch (e) {
-      debugPrint('Purchase error: $e');
-      return false;
-    }
-  }
-
-  /// Mark user as premium
-  Future<void> setPremium(bool value, {String? purchaseId, String? productId}) async {
+  /// Called when a purchase is verified. Sets premium and syncs to Firebase.
+  Future<void> setPremium(
+    bool value, {
+    String? purchaseId,
+    String? productId,
+  }) async {
     _isPremium = value;
+
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_premiumKey, value);
     await prefs.setString(_purchaseDateKey, DateTime.now().toIso8601String());
-    
-    // Sync to Firebase if user is signed in
+
+    // Calculate and cache local expiry date
+    DateTime? expiry;
+    if (value && productId != null) {
+      expiry = productId == annualSubscriptionId
+          ? DateTime.now().add(_annualDuration)
+          : DateTime.now().add(_monthlyDuration);
+      await prefs.setString(_expiryKey, expiry.toIso8601String());
+      await prefs.setString(_productIdKey, productId);
+    } else if (!value) {
+      await prefs.remove(_expiryKey);
+      await prefs.remove(_productIdKey);
+    }
+
+    // Sync to Firebase if signed in
     if (_auth.isSignedIn) {
       try {
         await _firestore.saveSubscription(
@@ -117,79 +154,69 @@ class SubscriptionService {
           isPremium: value,
           purchaseId: purchaseId,
           productId: productId,
-          expiryDate: productId == monthlySubscriptionId 
-              ? DateTime.now().add(const Duration(days: 30))
-              : null,
+          expiryDate: expiry,
         );
-        debugPrint('✅ [Subscription] Synced to Firebase');
+        debugPrint('✅ [Subscription] Synced to Firebase (premium=$value, expiry=$expiry)');
       } catch (e) {
         debugPrint('⚠️  [Subscription] Firebase sync failed: $e');
-        // Continue even if Firebase sync fails
       }
     }
   }
-  
-  /// Sync subscription status from Firebase
+
+  // ── Firebase sync ───────────────────────────────────────────────────────
+
   Future<void> syncFromFirebase() async {
-    if (!_auth.isSignedIn) {
-      debugPrint('⚠️  [Subscription] Not signed in, skipping Firebase sync');
-      return;
-    }
-    
+    if (!_auth.isSignedIn) return;
+
     try {
       debugPrint('🔄 [Subscription] Syncing from Firebase');
       final data = await _firestore.getSubscription(_auth.currentUser!.uid);
-      
+
       if (data != null) {
         final isPremium = data['isPremium'] as bool? ?? false;
-        
-        // Check if subscription is expired (for monthly)
+
+        // Check server-side expiry date
         if (data['expiryDate'] != null) {
-          final expiryDate = (data['expiryDate'] as dynamic).toDate();
+          final expiryDate = (data['expiryDate'] as dynamic).toDate() as DateTime;
           if (DateTime.now().isAfter(expiryDate)) {
-            debugPrint('⚠️  [Subscription] Subscription expired');
+            debugPrint('⚠️  [Subscription] Server expiry passed — revoking premium');
             await setPremium(false);
             return;
           }
         }
-        
+
         _isPremium = isPremium;
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool(_premiumKey, isPremium);
-        
-        debugPrint('✅ [Subscription] Synced from Firebase: isPremium=$isPremium');
+        debugPrint('✅ [Subscription] Synced: isPremium=$isPremium');
       }
     } catch (e) {
       debugPrint('❌ [Subscription] Firebase sync failed: $e');
     }
   }
 
-  /// Restore purchases
+  // ── Restore & validate ──────────────────────────────────────────────────
+
+  /// Restores purchases — use when user reinstalls or switches device.
   Future<void> restorePurchases() async {
     try {
       await iap.restorePurchases();
-      // Update premium status based on restored purchases
       await _loadPremiumStatus();
     } catch (e) {
-      debugPrint('Restore purchases error: $e');
+      debugPrint('❌ [Subscription] Restore error: $e');
     }
   }
 
-  /// Check if premium is valid (for future backend validation)
-  Future<bool> validatePremium() async {
-    // For now, just return local status
-    // Later can add backend validation
-    return _isPremium;
-  }
+  Future<bool> validatePremium() async => _isPremium;
 
-  /// Get purchase date
   Future<String?> getPurchaseDate() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_purchaseDateKey);
   }
 
-  /// Cancel subscription (placeholder for future implementation)
-  Future<void> cancelSubscription() async {
-    await setPremium(false);
+  /// Returns which plan the user is on, or null if not subscribed.
+  Future<String?> getActivePlanId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_productIdKey);
   }
 }

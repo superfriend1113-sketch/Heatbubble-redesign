@@ -10,16 +10,27 @@ import android.util.Log
 import android.view.View
 import android.widget.RemoteViews
 
+/**
+ * HeatBubble Home Screen Widget
+ *
+ * Premium gating is enforced HERE on the native side:
+ *   - If hw_is_premium == "true"  → show temperature, trend, status
+ *   - If hw_is_premium == "false" → show lock screen with upgrade CTA
+ *
+ * This cannot be bypassed from the OS widget picker since the content
+ * is controlled by the data written by Flutter's HomeWidgetService.
+ */
 class HeatBubbleWidget : AppWidgetProvider() {
 
     companion object {
-        private const val TAG        = "HeatBubbleWidget"
-        private const val PREFS_NAME = "HomeWidgetPreferences"
-        private const val KEY_TEMP    = "hw_temperature"
-        private const val KEY_TREND   = "hw_trend"
-        private const val KEY_ALERT   = "hw_alert"
-        private const val KEY_UPDATED = "hw_updated"
-        private const val KEY_STATUS  = "hw_status"
+        private const val TAG         = "HeatBubbleWidget"
+        private const val PREFS_NAME  = "HomeWidgetPreferences"
+        private const val KEY_TEMP      = "hw_temperature"
+        private const val KEY_TREND     = "hw_trend"
+        private const val KEY_ALERT     = "hw_alert"
+        private const val KEY_UPDATED   = "hw_updated"
+        private const val KEY_STATUS    = "hw_status"
+        private const val KEY_IS_PREMIUM = "hw_is_premium"
     }
 
     override fun onUpdate(
@@ -29,11 +40,12 @@ class HeatBubbleWidget : AppWidgetProvider() {
     ) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
-        val temp    = prefs.getString(KEY_TEMP,    null) ?: "--"
-        val trend   = prefs.getString(KEY_TREND,   null) ?: "Stable"
-        val alert   = prefs.getString(KEY_ALERT,   "false") == "true"
-        val updated = prefs.getString(KEY_UPDATED, null) ?: ""
-        val status  = prefs.getString(KEY_STATUS,  null) ?: "Normal"
+        val isPremium = prefs.getString(KEY_IS_PREMIUM, "false") == "true"
+        val temp      = prefs.getString(KEY_TEMP,    null) ?: "--"
+        val trend     = prefs.getString(KEY_TREND,   null) ?: "Stable"
+        val alert     = prefs.getString(KEY_ALERT,   "false") == "true"
+        val updated   = prefs.getString(KEY_UPDATED, null) ?: ""
+        val status    = prefs.getString(KEY_STATUS,  null) ?: "Normal"
 
         val trendDisplay = when (trend) {
             "Rising"  -> "^ Rising"
@@ -41,38 +53,86 @@ class HeatBubbleWidget : AppWidgetProvider() {
             else      -> "- Stable"
         }
 
-        Log.d(TAG, "onUpdate: temp=$temp trend=$trendDisplay status=$status alert=$alert")
+        Log.d(TAG, "onUpdate: premium=$isPremium temp=$temp trend=$trendDisplay status=$status")
 
         for (id in appWidgetIds) {
             try {
                 val views = RemoteViews(context.packageName, R.layout.heatbubble_widget)
 
-                // Only setTextViewText — no setInt, no setTextColor, no setBackgroundColor
-                views.setTextViewText(R.id.widget_temperature, temp)
-                views.setTextViewText(R.id.widget_trend, trendDisplay)
-                views.setTextViewText(R.id.widget_status, status)
-                views.setTextViewText(R.id.widget_updated, updated)
-                views.setViewVisibility(
-                    R.id.widget_alert,
-                    if (alert) View.VISIBLE else View.GONE
-                )
+                if (isPremium) {
+                    // ── UNLOCKED: show temperature data ──
+                    showPremiumContent(views, temp, trendDisplay, status, updated, alert)
+                } else {
+                    // ── LOCKED: show upgrade prompt ──
+                    showLockScreen(views)
+                }
 
-                // Tap → open app
-                val intent = context.packageManager
+                // Tap anything → open the app
+                val launchIntent = context.packageManager
                     .getLaunchIntentForPackage(context.packageName)
-                if (intent != null) {
+                if (launchIntent != null) {
                     val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M)
                         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
                     else PendingIntent.FLAG_UPDATE_CURRENT
-                    val pi = PendingIntent.getActivity(context, id, intent, flags)
+                    val pi = PendingIntent.getActivity(context, id, launchIntent, flags)
+                    // Apply to both locked and unlocked tap targets
+                    views.setOnClickPendingIntent(R.id.widget_lock_cta, pi)
                     views.setOnClickPendingIntent(R.id.widget_temperature, pi)
                 }
 
                 appWidgetManager.updateAppWidget(id, views)
-                Log.d(TAG, "Widget $id OK: $temp $trendDisplay")
+                Log.d(TAG, "Widget $id rendered OK (premium=$isPremium)")
             } catch (e: Exception) {
                 Log.e(TAG, "Widget $id FAILED: ${e.message}", e)
             }
         }
+    }
+
+    // ── Show full temperature content (premium users) ──────────────────────
+    private fun showPremiumContent(
+        views: RemoteViews,
+        temp: String,
+        trend: String,
+        status: String,
+        updated: String,
+        alert: Boolean
+    ) {
+        // Hide lock views
+        views.setViewVisibility(R.id.widget_lock_icon,    View.GONE)
+        views.setViewVisibility(R.id.widget_lock_title,   View.GONE)
+        views.setViewVisibility(R.id.widget_lock_message, View.GONE)
+        views.setViewVisibility(R.id.widget_lock_cta,     View.GONE)
+
+        // Show content views
+        views.setViewVisibility(R.id.widget_app_name,   View.VISIBLE)
+        views.setViewVisibility(R.id.widget_temperature, View.VISIBLE)
+        views.setViewVisibility(R.id.widget_trend,       View.VISIBLE)
+        views.setViewVisibility(R.id.widget_status,      View.VISIBLE)
+        views.setViewVisibility(R.id.widget_updated,     View.VISIBLE)
+        views.setViewVisibility(R.id.widget_alert,
+            if (alert) View.VISIBLE else View.GONE)
+
+        // Set text values
+        views.setTextViewText(R.id.widget_temperature, temp)
+        views.setTextViewText(R.id.widget_trend,       trend)
+        views.setTextViewText(R.id.widget_status,      status)
+        views.setTextViewText(R.id.widget_updated,     updated)
+    }
+
+    // ── Show lock / upgrade screen (non-premium users) ────────────────────
+    private fun showLockScreen(views: RemoteViews) {
+        // Show lock views
+        views.setViewVisibility(R.id.widget_lock_icon,    View.VISIBLE)
+        views.setViewVisibility(R.id.widget_lock_title,   View.VISIBLE)
+        views.setViewVisibility(R.id.widget_lock_message, View.VISIBLE)
+        views.setViewVisibility(R.id.widget_lock_cta,     View.VISIBLE)
+
+        // Hide content views
+        views.setViewVisibility(R.id.widget_app_name,   View.GONE)
+        views.setViewVisibility(R.id.widget_temperature, View.GONE)
+        views.setViewVisibility(R.id.widget_trend,       View.GONE)
+        views.setViewVisibility(R.id.widget_status,      View.GONE)
+        views.setViewVisibility(R.id.widget_updated,     View.GONE)
+        views.setViewVisibility(R.id.widget_alert,       View.GONE)
     }
 }

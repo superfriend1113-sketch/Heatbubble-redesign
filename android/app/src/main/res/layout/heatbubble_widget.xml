@@ -1,12 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  SAMSUNG ONE UI WIDGET RULES (learned the hard way):
-  - Root ViewGroup must be LinearLayout with orientation=vertical
-  - Do NOT nest any additional ViewGroups inside — Samsung's RemoteViews inflater
-    silently rejects nested LinearLayouts and causes "Can't load widget"
-  - Do NOT use plain <View> tags (not on the RemoteViews whitelist on Samsung)
-  - Only TextView children allowed at the top level
-  - Background must be an inline hex color — no @drawable references
+  SAMSUNG ONE UI SAFE RULES:
+  - Only LinearLayout (root, vertical) + TextView children
+  - No nested ViewGroups, no plain <View> dividers
+  - Inline hex background only
+
+  Premium gating: widget_lock_* views shown when hw_is_premium=false.
+  Normal content views shown when hw_is_premium=true.
+  Visibility toggled in HeatBubbleWidget.kt via setViewVisibility only.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -19,7 +20,52 @@
     android:paddingBottom="14dp"
     android:gravity="center_vertical">
 
-    <!-- App branding -->
+    <!-- ══ LOCKED STATE (shown to non-premium users) ══ -->
+
+    <TextView
+        android:id="@+id/widget_lock_icon"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="HeatBubble"
+        android:textColor="#CCFFFFFF"
+        android:textSize="11sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_lock_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Premium Required"
+        android:textColor="#FFFFFF"
+        android:textSize="20sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_lock_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="Open HeatBubble to unlock home screen widgets"
+        android:textColor="#DDFFFFFF"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/widget_lock_cta"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="Upgrade to Premium"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
+    <!-- ══ UNLOCKED STATE (shown to premium users) ══ -->
+
     <TextView
         android:id="@+id/widget_app_name"
         android:layout_width="match_parent"
@@ -27,9 +73,9 @@
         android:text="HeatBubble"
         android:textColor="#CCFFFFFF"
         android:textSize="11sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        android:visibility="gone" />
 
-    <!-- Big temperature reading -->
     <TextView
         android:id="@+id/widget_temperature"
         android:layout_width="wrap_content"
@@ -38,9 +84,9 @@
         android:text="--"
         android:textColor="#FFFFFF"
         android:textSize="40sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        android:visibility="gone" />
 
-    <!-- Trend: "^ Rising", "v Falling", "- Stable" -->
     <TextView
         android:id="@+id/widget_trend"
         android:layout_width="wrap_content"
@@ -49,9 +95,9 @@
         android:text="- Stable"
         android:textColor="#DDFFFFFF"
         android:textSize="13sp"
-        android:textStyle="bold" />
+        android:textStyle="bold"
+        android:visibility="gone" />
 
-    <!-- Status label: Normal / Warm / Elevated / Fever Alert -->
     <TextView
         android:id="@+id/widget_status"
         android:layout_width="wrap_content"
@@ -59,9 +105,9 @@
         android:layout_marginTop="2dp"
         android:text="Normal"
         android:textColor="#BBFFFFFF"
-        android:textSize="11sp" />
+        android:textSize="11sp"
+        android:visibility="gone" />
 
-    <!-- Last updated time, right-aligned -->
     <TextView
         android:id="@+id/widget_updated"
         android:layout_width="match_parent"
@@ -70,9 +116,9 @@
         android:text=""
         android:textColor="#88FFFFFF"
         android:textSize="10sp"
-        android:gravity="end" />
+        android:gravity="end"
+        android:visibility="gone" />
 
-    <!-- Alert bar — visible only when temp rising and > 37.5 -->
     <TextView
         android:id="@+id/widget_alert"
         android:layout_width="match_parent"
