@@ -31,6 +31,7 @@ class HeatBubbleWidget : AppWidgetProvider() {
         private const val KEY_UPDATED   = "hw_updated"
         private const val KEY_STATUS    = "hw_status"
         private const val KEY_IS_PREMIUM = "hw_is_premium"
+        private const val KEY_TIP         = "hw_tip"
     }
 
     override fun onUpdate(
@@ -46,6 +47,7 @@ class HeatBubbleWidget : AppWidgetProvider() {
         val alert     = prefs.getString(KEY_ALERT,   "false") == "true"
         val updated   = prefs.getString(KEY_UPDATED, null) ?: ""
         val status    = prefs.getString(KEY_STATUS,  null) ?: "Normal"
+        val tip       = prefs.getString(KEY_TIP,     null) ?: ""
 
         val trendDisplay = when (trend) {
             "Rising"  -> "^ Rising"
@@ -61,7 +63,7 @@ class HeatBubbleWidget : AppWidgetProvider() {
 
                 if (isPremium) {
                     // ── UNLOCKED: show temperature data ──
-                    showPremiumContent(views, temp, trendDisplay, status, updated, alert)
+                    showPremiumContent(views, temp, trendDisplay, status, updated, alert, tip)
                 } else {
                     // ── LOCKED: show upgrade prompt ──
                     showLockScreen(views)
@@ -95,7 +97,8 @@ class HeatBubbleWidget : AppWidgetProvider() {
         trend: String,
         status: String,
         updated: String,
-        alert: Boolean
+        alert: Boolean,
+        tip: String
     ) {
         // Hide lock views
         views.setViewVisibility(R.id.widget_lock_icon,    View.GONE)
@@ -111,6 +114,10 @@ class HeatBubbleWidget : AppWidgetProvider() {
         views.setViewVisibility(R.id.widget_updated,     View.VISIBLE)
         views.setViewVisibility(R.id.widget_alert,
             if (alert) View.VISIBLE else View.GONE)
+        // Show tip if available
+        val showTip = tip.isNotEmpty()
+        views.setViewVisibility(R.id.widget_tip, if (showTip) View.VISIBLE else View.GONE)
+        if (showTip) views.setTextViewText(R.id.widget_tip, tip)
 
         // Set text values
         views.setTextViewText(R.id.widget_temperature, temp)
@@ -127,12 +134,13 @@ class HeatBubbleWidget : AppWidgetProvider() {
         views.setViewVisibility(R.id.widget_lock_message, View.VISIBLE)
         views.setViewVisibility(R.id.widget_lock_cta,     View.VISIBLE)
 
-        // Hide content views
+        // Hide all content views including tip
         views.setViewVisibility(R.id.widget_app_name,   View.GONE)
         views.setViewVisibility(R.id.widget_temperature, View.GONE)
         views.setViewVisibility(R.id.widget_trend,       View.GONE)
         views.setViewVisibility(R.id.widget_status,      View.GONE)
         views.setViewVisibility(R.id.widget_updated,     View.GONE)
         views.setViewVisibility(R.id.widget_alert,       View.GONE)
+        views.setViewVisibility(R.id.widget_tip,         View.GONE)
     }
 }

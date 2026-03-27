@@ -22,6 +22,7 @@ class HomeWidgetService {
   static const String _keyUpdated   = 'hw_updated';
   static const String _keyStatus    = 'hw_status';
   static const String _keyIsPremium = 'hw_is_premium';
+  static const String _keyTip       = 'hw_tip';
 
   /// Saves temperature data and triggers an Android widget refresh.
   /// [isPremium] controls whether the widget shows temp data or a lock screen.
@@ -37,6 +38,7 @@ class HomeWidgetService {
           : '--';
       final isAlert = isPremium && trend == 'Rising' && temperature > 37.5;
       final status  = isPremium ? _statusLabel(temperature) : 'Premium';
+      final tip     = isPremium ? _tipMessage(temperature, trend) : '';
       final now     = _timeString();
 
       await HomeWidget.saveWidgetData<String>(_keyTemp,      formatted);
@@ -45,6 +47,7 @@ class HomeWidgetService {
       await HomeWidget.saveWidgetData<String>(_keyUpdated,   now);
       await HomeWidget.saveWidgetData<String>(_keyStatus,    status);
       await HomeWidget.saveWidgetData<String>(_keyIsPremium, isPremium.toString());
+      await HomeWidget.saveWidgetData<String>(_keyTip,       tip);
 
       await HomeWidget.updateWidget(
         androidName: _androidWidgetName,
@@ -64,6 +67,39 @@ class HomeWidgetService {
     if (tempC < 37.0) return 'Warm';
     if (tempC < 37.5) return 'Elevated';
     return 'Fever Alert';
+  }
+
+  /// Friendly, contextual tip shown on the home screen widget.
+  String _tipMessage(double tempC, String trend) {
+    if (tempC <= 0) return 'Open the app to take a reading.';
+
+    final rising  = trend == 'Rising';
+    final falling = trend == 'Falling';
+
+    if (tempC < 34.0) {
+      if (rising)  return 'Cool but climbing — keep an eye on it!';
+      if (falling) return 'Feeling cool and dropping. All good!';
+      return 'Hi! Feeling cool today. Stay comfortable!';
+    }
+    if (tempC < 35.5) {
+      if (rising)  return 'Warming up a little — stay hydrated!';
+      if (falling) return 'Normal and easing off. You are doing well!';
+      return 'Normal reading. You are in great shape today!';
+    }
+    if (tempC < 37.0) {
+      if (rising)  return 'Getting warm! Take a short break and drink water.';
+      if (falling) return 'Warm but cooling down. Good sign — rest up!';
+      return 'A bit warm today. Drink some water and chill!';
+    }
+    if (tempC < 37.5) {
+      if (rising)  return 'Elevated and rising — rest is recommended!';
+      if (falling) return 'Elevated but trending down. Keep resting!';
+      return 'Elevated reading. Take it easy and stay cool.';
+    }
+    // > 37.5 — alert zone
+    if (rising)  return 'High alert! Rest, hydrate, and take care now.';
+    if (falling) return 'Very high but dropping. Rest and drink water!';
+    return 'High reading. Please rest well and stay hydrated.';
   }
 
   static Future<void> init() async {

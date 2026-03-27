@@ -114,14 +114,9 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
         orElse: () => throw Exception('Product not found. Please try again.'),
       );
 
+      // All our offerings are subscriptions — always buyNonConsumable
       final purchaseParam = PurchaseParam(productDetails: product);
-      
-      // Determine purchase type
-      if (productId == SubscriptionService.oneTimePurchaseId) {
-        await _iap.buyNonConsumable(purchaseParam: purchaseParam);
-      } else {
-        await _iap.buyConsumable(purchaseParam: purchaseParam);
-      }
+      await _iap.buyNonConsumable(purchaseParam: purchaseParam);
     } catch (e) {
       debugPrint('❌ [Paywall] Purchase error: $e');
       _showError(e.toString());
@@ -269,6 +264,25 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
                           color: Colors.grey[600],
                         ),
                       ),
+                      const SizedBox(height: 8),
+                      // 7-day trial badge
+                      Container(
+                        margin: const EdgeInsets.only(top: 4, bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFF6B35).withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: const Color(0xFFFF6B35).withValues(alpha: 0.3)),
+                        ),
+                        child: const Text(
+                          '7-day free trial for new subscribers',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFFFF6B35),
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 32),
 
                       // Features list
@@ -305,20 +319,22 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
 
                       // Price options
                       if (_subscription.products.isNotEmpty) ...[
+                        // Annual — best value (highlighted)
                         _buildPriceOption(
-                          productId: SubscriptionService.oneTimePurchaseId,
-                          title: 'Lifetime Access',
-                          price: _getProductPrice(SubscriptionService.oneTimePurchaseId),
-                          period: 'One-time payment',
+                          productId: SubscriptionService.annualSubscriptionId,
+                          title: 'Annual',
+                          price: _getProductPrice(SubscriptionService.annualSubscriptionId),
+                          period: 'Per year  •  Save 17%',
                           isBestValue: true,
                           savings: 'Best Value',
                         ),
                         const SizedBox(height: 12),
+                        // Monthly
                         _buildPriceOption(
                           productId: SubscriptionService.monthlySubscriptionId,
                           title: 'Monthly',
                           price: _getProductPrice(SubscriptionService.monthlySubscriptionId),
-                          period: 'Per month',
+                          period: 'Per month  •  Cancel anytime',
                           isBestValue: false,
                           savings: null,
                         ),
@@ -533,7 +549,8 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
       final product = _subscription.products.firstWhere((p) => p.id == productId);
       return product.price;
     } catch (e) {
-      return productId == SubscriptionService.oneTimePurchaseId ? '\$2.99' : '\$1.99';
+      // Fallback prices shown while products are loading
+      return productId == SubscriptionService.annualSubscriptionId ? r'$19.99' : r'$1.99';
     }
   }
 }
