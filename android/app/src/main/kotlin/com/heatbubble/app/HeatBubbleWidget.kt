@@ -1,4 +1,4 @@
-package com.example.heatbubble
+package com.heatbubble.app
 
 import android.app.PendingIntent
 import android.appwidget.AppWidgetManager

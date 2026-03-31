@@ -1,4 +1,4 @@
-package com.example.heatbubble
+package com.heatbubble.app
 
 import android.content.Intent
 import android.content.IntentFilter

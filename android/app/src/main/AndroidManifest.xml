@@ -22,8 +22,7 @@
         android:label="HeatBubble"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
-        android:networkSecurityConfig="@xml/network_security_config"
-        android:usesCleartextTraffic="true">
+        android:networkSecurityConfig="@xml/network_security_config">
 
         <!-- Enable hardware acceleration for WebView -->
         <meta-data
@@ -53,16 +52,14 @@
             android:name="flutterEmbedding"
             android:value="2" />
         
-        <!-- AdMob App ID -->
-        <!-- Using Google's test App ID (works on ALL devices) -->
-        <!-- Switch to real ID before production: ca-app-pub-3676471973768636~4261706101 -->
+        <!-- AdMob App ID (Production) -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3940256099942544~3347511713"/>
+            android:value="ca-app-pub-3676471973768636~4261706101"/>
 
         <!-- ── HeatBubble Home Screen Widget ── -->
         <receiver
-            android:name=".HeatBubbleWidget"
+            android:name="com.heatbubble.app.HeatBubbleWidget"
             android:exported="true"
             android:label="HeatBubble Widget">
             <intent-filter>

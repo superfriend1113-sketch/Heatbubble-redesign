@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -6,8 +8,15 @@ plugins {
     id("com.google.gms.google-services")
 }
 
+// Load keystore credentials from key.properties
+val keystoreProperties = Properties()
+val keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(keystorePropertiesFile.inputStream())
+}
+
 android {
-    namespace = "com.example.heatbubble"
+    namespace = "com.heatbubble.app"
     compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
@@ -21,8 +30,17 @@ android {
         jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
+    signingConfigs {
+        create("release") {
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
+            storeFile = file(keystoreProperties["storeFile"] as String)
+            storePassword = keystoreProperties["storePassword"] as String
+        }
+    }
+
     defaultConfig {
-        applicationId = "com.example.heatbubble"
+        applicationId = "com.heatbubble.app"
         minSdk = 24
         targetSdk = 36
         versionCode = flutter.versionCode
@@ -31,7 +49,13 @@ android {
 
     buildTypes {
         release {
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("release")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
         }
     }
 }
