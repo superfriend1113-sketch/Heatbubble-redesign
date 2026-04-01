@@ -21,7 +21,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   final _sensor = SensorService();
   final _storage = StorageService();
   final _subscription = SubscriptionService();
@@ -36,6 +36,8 @@ class _HomeScreenState extends State<HomeScreen> {
   Timer? _pollTimer;
   Timer? _syncTimer;
   bool _showAdFailureBanner = false;
+  bool _isRefreshing = false; // Add loading state for refresh button
+  late AnimationController _refreshController; // Add animation controller
 
   // Trend
   String _trendLabel = 'Stable';
@@ -44,6 +46,10 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _refreshController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
     _initServices();
     _loadData();
     _pollTimer = Timer.periodic(const Duration(seconds: 8), (_) => _loadData());
@@ -87,11 +93,17 @@ class _HomeScreenState extends State<HomeScreen> {
   void dispose() {
     _pollTimer?.cancel();
     _syncTimer?.cancel();
+    _refreshController.dispose();
     _ads.disposeBannerAd();
     super.dispose();
   }
 
   Future<void> _loadData() async {
+    if (_isRefreshing) return; // Prevent multiple simultaneous refreshes
+    
+    setState(() => _isRefreshing = true);
+    _refreshController.repeat(); // Start spinning animation
+    
     try {
       final result = await _sensor.getCurrentTemp();
       final temp = result.calibrated;
@@ -167,7 +179,16 @@ class _HomeScreenState extends State<HomeScreen> {
           isPremium: _subscription.isPremium || kDevHomeWidgetBypass,
         );
       }
-    } catch (_) {}
+    } catch (_) {
+      // Error handling
+    } finally {
+      // Stop refresh animation
+      if (mounted) {
+        _refreshController.stop();
+        _refreshController.reset();
+        setState(() => _isRefreshing = false);
+      }
+    }
   }
 
   @override
@@ -221,7 +242,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
                 GestureDetector(
-                  onTap: _loadData,
+                  onTap: _isRefreshing ? null : _loadData,
                   child: Container(
                     width: 40,
                     height: 40,
@@ -229,7 +250,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: Colors.white.withAlpha(70),
                       shape: BoxShape.circle,
                     ),
-                    child: const Icon(LucideIcons.refreshCw, size: 18, color: Color(0xFF111827)),
+                    child: _isRefreshing
+                        ? RotationTransition(
+                            turns: _refreshController,
+                            child: const Icon(LucideIcons.refreshCw, size: 18, color: Color(0xFF111827)),
+                          )
+                        : const Icon(LucideIcons.refreshCw, size: 18, color: Color(0xFF111827)),
                   ),
                 ),
               ],

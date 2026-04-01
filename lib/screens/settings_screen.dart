@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/unit_service.dart';
 import '../services/subscription_service.dart';
 import '../services/firebase_auth_service.dart';
 import '../services/firebase_sync_service.dart';
 import '../services/firebase_firestore_service.dart';
+import '../services/nudge_service.dart';
 import '../screens/paywall_screen.dart';
 import '../screens/custom_alerts_screen.dart';
 import '../screens/auth/login_screen.dart';
@@ -19,6 +21,11 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   bool _autoDetectSensors = true;
   bool _batteryFallback = true;
+  bool _notificationsEnabled = true;
+  bool _temperatureAlerts = true;
+  bool _trendAlerts = true;
+  bool _dailyReminders = false;
+  
   final _subscription = SubscriptionService();
   final _auth = FirebaseAuthService();
   final _sync = FirebaseSyncService();
@@ -32,6 +39,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
     super.initState();
     _subscription.init();
     _loadCloudData();
+    _loadNotificationPreferences();
+  }
+
+  Future<void> _loadNotificationPreferences() async {
+    // Load notification preferences from SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+      _temperatureAlerts = prefs.getBool('temperature_alerts') ?? true;
+      _trendAlerts = prefs.getBool('trend_alerts') ?? true;
+      _dailyReminders = prefs.getBool('daily_reminders') ?? false;
+    });
+  }
+
+  Future<void> _saveNotificationPreference(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
   }
 
   Future<void> _loadCloudData() async {
@@ -560,6 +584,76 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     unit: TempUnit.kelvin,
                     us: us,
                   ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Notifications ──
+            _glassCard(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(LucideIcons.bell, size: 18, color: Color(0xFF111827)),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Notifications',
+                        style: TextStyle(
+                          color: Color(0xFF111827),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  _toggleRow(
+                    title: 'Enable Notifications',
+                    subtitle: 'Receive app notifications',
+                    value: _notificationsEnabled,
+                    onChanged: (v) {
+                      setState(() => _notificationsEnabled = v);
+                      _saveNotificationPreference('notifications_enabled', v);
+                    },
+                  ),
+                  if (_notificationsEnabled) ...[
+                    const SizedBox(height: 8),
+                    Divider(color: const Color(0xFF111827).withAlpha(20), height: 24),
+                    const SizedBox(height: 8),
+                    _toggleRow(
+                      title: 'Temperature Alerts',
+                      subtitle: 'Alert when temperature is extreme',
+                      value: _temperatureAlerts,
+                      onChanged: (v) {
+                        setState(() => _temperatureAlerts = v);
+                        _saveNotificationPreference('temperature_alerts', v);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _toggleRow(
+                      title: 'Trend Alerts',
+                      subtitle: 'Alert on significant temperature changes',
+                      value: _trendAlerts,
+                      onChanged: (v) {
+                        setState(() => _trendAlerts = v);
+                        _saveNotificationPreference('trend_alerts', v);
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    _toggleRow(
+                      title: 'Daily Reminders',
+                      subtitle: 'Remind to check temperature daily',
+                      value: _dailyReminders,
+                      onChanged: (v) async {
+                        setState(() => _dailyReminders = v);
+                        await _saveNotificationPreference('daily_reminders', v);
+                        // Schedule or cancel daily reminder
+                        await NudgeService().scheduleDailyReminder();
+                      },
+                    ),
+                  ],
                 ],
               ),
             ),

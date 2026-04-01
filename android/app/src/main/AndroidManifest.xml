@@ -52,10 +52,10 @@
             android:name="flutterEmbedding"
             android:value="2" />
         
-        <!-- AdMob App ID (Production) -->
+        <!-- AdMob App ID (Google Test ID - works on all devices) -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-3676471973768636~4261706101"/>
+            android:value="ca-app-pub-3940256099942544~3347511713"/>
 
         <!-- ── HeatBubble Home Screen Widget ── -->
         <receiver

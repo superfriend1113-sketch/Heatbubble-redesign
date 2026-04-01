@@ -2,15 +2,16 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'screens/home_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/ai_screen.dart';
 import 'screens/settings_screen.dart';
-import 'screens/get_started_screen.dart';
+import 'screens/onboarding_screen.dart';
 
 class HeatBubbleApp extends StatelessWidget {
-  const HeatBubbleApp({super.key});
+  final bool showOnboarding;
+  
+  const HeatBubbleApp({super.key, this.showOnboarding = false});
 
   @override
   Widget build(BuildContext context) {
@@ -32,29 +33,7 @@ class HeatBubbleApp extends StatelessWidget {
         textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme),
         useMaterial3: true,
       ),
-      home: const _SplashRouter(),
-    );
-  }
-}
-
-/// Checks SharedPreferences to decide first-launch vs returning user
-class _SplashRouter extends StatelessWidget {
-  const _SplashRouter();
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<bool>(
-      future: SharedPreferences.getInstance()
-          .then((p) => p.getBool('onboarded') ?? false),
-      builder: (context, snap) {
-        if (!snap.hasData) {
-          return const Scaffold(
-            backgroundColor: Color(0xFFFF8E53),
-            body: SizedBox.shrink(),
-          );
-        }
-        return snap.data! ? const AppShell() : const GetStartedScreen();
-      },
+      home: showOnboarding ? const OnboardingScreen() : const AppShell(),
     );
   }
 }

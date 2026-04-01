@@ -5,6 +5,8 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:workmanager/workmanager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:timezone/data/latest_all.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 import 'services/nudge_service.dart';
 import 'services/background_service.dart';
 import 'services/unit_service.dart';
@@ -12,14 +14,15 @@ import 'services/firebase_init_service.dart';
 import 'services/firebase_auth_service.dart';
 import 'services/subscription_service.dart';
 import 'services/home_widget_service.dart';
+import 'screens/onboarding_screen.dart';
 import 'app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Reset onboarding to show GetStartedScreen (temporary for testing)
+  // Check if onboarding has been completed
   final prefs = await SharedPreferences.getInstance();
-  await prefs.remove('onboarded');
+  final bool onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
 
   // Set system UI styles synchronously (no await needed)
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
@@ -33,6 +36,10 @@ void main() async {
   );
 
   // ── OPTIMIZED: Parallelize independent initialization tasks ──────────────
+  // Initialize timezone database first (required for scheduled notifications)
+  tz.initializeTimeZones();
+  tz.setLocalLocation(tz.getLocation('America/New_York')); // Default timezone
+  
   // Run all independent async operations concurrently
   await Future.wait([
     // Initialize Mobile Ads SDK
@@ -49,6 +56,9 @@ void main() async {
     HomeWidgetService.init(),
   ]);
   
+  // Schedule daily reminder if enabled
+  await NudgeService().scheduleDailyReminder();
+  
   // Initialize Firebase (optional - won't block if not configured)
   try {
     await FirebaseInitService().initialize();
@@ -60,7 +70,7 @@ void main() async {
     debugPrint('   App will work without Firebase features');
   }
 
-  runApp(const HeatBubbleApp());
+  runApp(HeatBubbleApp(showOnboarding: !onboardingCompleted));
 }
 
 /// Initialize Mobile Ads SDK with test device configuration

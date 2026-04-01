@@ -1,4 +1,6 @@
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:timezone/timezone.dart' as tz;
 import 'alert_store.dart';
 import 'comparison_service.dart';
 
@@ -54,6 +56,13 @@ class NudgeService {
   // Extreme temperature check — fired every background cycle
   // ─────────────────────────────────────────────────────
   Future<void> checkExtremeTemp(double celsius) async {
+    // Check if notifications and temperature alerts are enabled
+    final prefs = await SharedPreferences.getInstance();
+    final notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+    final temperatureAlerts = prefs.getBool('temperature_alerts') ?? true;
+    
+    if (!notificationsEnabled || !temperatureAlerts) return;
+    
     if (celsius <= _extremeColdCelsius) {
       const message = "🥶 Seek shelter — I hope you're dressed for the cold weather!";
       await _sendExtremeNotification(
@@ -123,6 +132,13 @@ class NudgeService {
     required double currentTemp,
     required double averageTemp,
   }) async {
+    // Check if notifications and trend alerts are enabled
+    final prefs = await SharedPreferences.getInstance();
+    final notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+    final trendAlerts = prefs.getBool('trend_alerts') ?? true;
+    
+    if (!notificationsEnabled || !trendAlerts) return;
+    
     if (averageTemp == 0.0) return;
     final diff = currentTemp - averageTemp;
     if (diff.abs() < 3.0) return;
@@ -191,6 +207,13 @@ class NudgeService {
   // Comparison-based notification (random interval)
   // ─────────────────────────────────────────────────────
   Future<void> sendComparisonNotification(ComparisonResult result) async {
+    // Check if notifications and trend alerts are enabled
+    final prefs = await SharedPreferences.getInstance();
+    final notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+    final trendAlerts = prefs.getBool('trend_alerts') ?? true;
+    
+    if (!notificationsEnabled || !trendAlerts) return;
+    
     await _sendStandardNotification(result.message);
 
     final alertType = result.diff > 0 ? AlertType.risingTrend
@@ -202,6 +225,55 @@ class NudgeService {
       message: result.message,
       timestamp: DateTime.now(),
     ));
+  }
+
+  // ─────────────────────────────────────────────────────
+  // Daily Reminder - scheduled notification
+  // ─────────────────────────────────────────────────────
+  Future<void> scheduleDailyReminder() async {
+    final prefs = await SharedPreferences.getInstance();
+    final notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
+    final dailyReminders = prefs.getBool('daily_reminders') ?? false;
+    
+    if (!notificationsEnabled || !dailyReminders) {
+      // Cancel any existing daily reminder
+      await _plugin.cancel(3000);
+      return;
+    }
+
+    // Schedule daily notification at 9 AM
+    await _plugin.zonedSchedule(
+      3000, // Unique ID for daily reminder
+      'HeatBubble Daily Reminder',
+      '🌡️ Don\'t forget to check your temperature today!',
+      _nextInstanceOf9AM(),
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'heatbubble_alerts',
+          'Temperature Alerts',
+          channelDescription: 'Notifies when your pocket temp is unusual.',
+          importance: Importance.high,
+          priority: Priority.high,
+          icon: '@mipmap/ic_launcher',
+          playSound: true,
+          enableVibration: true,
+        ),
+      ),
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      uiLocalNotificationDateInterpretation:
+          UILocalNotificationDateInterpretation.absoluteTime,
+      matchDateTimeComponents: DateTimeComponents.time, // Repeat daily
+    );
+  }
+
+  tz.TZDateTime _nextInstanceOf9AM() {
+    final tz.TZDateTime now = tz.TZDateTime.now(tz.local);
+    tz.TZDateTime scheduledDate =
+        tz.TZDateTime(tz.local, now.year, now.month, now.day, 9);
+    if (scheduledDate.isBefore(now)) {
+      scheduledDate = scheduledDate.add(const Duration(days: 1));
+    }
+    return scheduledDate;
   }
 }
 

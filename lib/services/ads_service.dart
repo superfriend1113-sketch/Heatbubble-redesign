@@ -7,8 +7,14 @@ class AdsService {
   factory AdsService() => _instance;
   AdsService._internal();
 
-  // ── Production AdMob Ad Unit IDs ───────────────────────────────────────────
-  static const String _bannerAdUnitId = 'ca-app-pub-3676471973768636/2948624436';
+  // ── Google Test AdMob Ad Unit IDs (work on all devices) ───────────────────
+  // These are official Google test IDs that always return test ads
+  // Banner Test ID:
+  static const String _bannerAdUnitId = 'ca-app-pub-3940256099942544/6300978111';
+  
+  // TODO: For production, replace with your real AdMob IDs:
+  // App ID (AndroidManifest.xml): ca-app-pub-3676471973768636~4261706101
+  // Banner ID: ca-app-pub-3676471973768636/2948624436
 
   // ── Internal state ─────────────────────────────────────────────────────────
   BannerAd? _bannerAd;
