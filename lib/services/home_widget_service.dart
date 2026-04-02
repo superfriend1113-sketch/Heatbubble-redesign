@@ -13,7 +13,7 @@ import 'unit_service.dart';
 ///   hw_status       → "Normal" | "Warm" | "Elevated" | "Fever Alert"
 ///   hw_is_premium   → "true" | "false"  ← gates widget content on the native side
 class HomeWidgetService {
-  static const String _appGroupId        = 'group.com.example.heatbubble';
+  static const String _appGroupId        = 'group.com.heatbubble.app';
   static const String _androidWidgetName = 'HeatBubbleWidget';
 
   static const String _keyTemp      = 'hw_temperature';
@@ -51,7 +51,7 @@ class HomeWidgetService {
 
       await HomeWidget.updateWidget(
         androidName: _androidWidgetName,
-        qualifiedAndroidName: 'com.example.heatbubble.$_androidWidgetName',
+        qualifiedAndroidName: 'com.heatbubble.app.$_androidWidgetName',
       );
 
       debugPrint('📱 [HomeWidget] $formatted | $trend | $status | premium=$isPremium');

@@ -7,12 +7,34 @@ class FirebaseFirestoreService {
   factory FirebaseFirestoreService() => _instance;
   FirebaseFirestoreService._internal();
 
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseFirestore? _firestore;
+
+  // Lazy-initialize Firestore (only when Firebase is ready)
+  FirebaseFirestore? get _firestoreInstance {
+    try {
+      _firestore ??= FirebaseFirestore.instance;
+      return _firestore;
+    } catch (e) {
+      debugPrint('⚠️  [Firestore] Firebase not initialized yet: $e');
+      return null;
+    }
+  }
 
   // Collection references
-  CollectionReference get users => _firestore.collection('users');
-  CollectionReference get readings => _firestore.collection('readings');
-  CollectionReference get subscriptions => _firestore.collection('subscriptions');
+  CollectionReference? get users {
+    final firestore = _firestoreInstance;
+    return firestore?.collection('users');
+  }
+  
+  CollectionReference? get readings {
+    final firestore = _firestoreInstance;
+    return firestore?.collection('readings');
+  }
+  
+  CollectionReference? get subscriptions {
+    final firestore = _firestoreInstance;
+    return firestore?.collection('subscriptions');
+  }
 
   /// Create new user profile
   Future<void> createUserProfile({
@@ -21,10 +43,16 @@ class FirebaseFirestoreService {
     String? displayName,
     String? photoURL,
   }) async {
+    final usersCollection = users;
+    if (usersCollection == null) {
+      debugPrint('❌ [Firestore] Firebase not initialized');
+      return;
+    }
+    
     try {
       debugPrint('💾 [Firestore] Creating user profile: $userId');
       
-      await users.doc(userId).set({
+      await usersCollection.doc(userId).set({
         'userId': userId,
         'email': email,
         'displayName': displayName,
@@ -45,10 +73,16 @@ class FirebaseFirestoreService {
     required String userId,
     required Map<String, dynamic> data,
   }) async {
+    final usersCollection = users;
+    if (usersCollection == null) {
+      debugPrint('❌ [Firestore] Firebase not initialized');
+      return;
+    }
+    
     try {
       debugPrint('💾 [Firestore] Saving user profile: $userId');
       
-      await users.doc(userId).set({
+      await usersCollection.doc(userId).set({
         ...data,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
@@ -62,10 +96,16 @@ class FirebaseFirestoreService {
 
   /// Get user profile data
   Future<Map<String, dynamic>?> getUserProfile(String userId) async {
+    final usersCollection = users;
+    if (usersCollection == null) {
+      debugPrint('❌ [Firestore] Firebase not initialized');
+      return null;
+    }
+    
     try {
       debugPrint('📖 [Firestore] Getting user profile: $userId');
       
-      final doc = await users.doc(userId).get();
+      final doc = await usersCollection.doc(userId).get();
       
       if (doc.exists) {
         debugPrint('✅ [Firestore] User profile found');
@@ -85,10 +125,16 @@ class FirebaseFirestoreService {
     required String userId,
     required TempReading reading,
   }) async {
+    final readingsCollection = readings;
+    if (readingsCollection == null) {
+      debugPrint('❌ [Firestore] Firebase not initialized');
+      return;
+    }
+    
     try {
       debugPrint('💾 [Firestore] Saving temperature reading for user: $userId');
       
-      await readings.add({
+      await readingsCollection.add({
         'userId': userId,
         'temperature': reading.temperature,
         'rawTemp': reading.rawTemp,
@@ -108,9 +154,15 @@ class FirebaseFirestoreService {
     required String userId,
     int limit = 100,
   }) {
+    final readingsCollection = readings;
+    if (readingsCollection == null) {
+      debugPrint('❌ [Firestore] Firebase not initialized');
+      return Stream.value([]);
+    }
+    
     debugPrint('📊 [Firestore] Streaming readings for user: $userId');
     
-    return readings
+    return readingsCollection
         .where('userId', isEqualTo: userId)
         .orderBy('timestamp', descending: true)
         .limit(limit)
@@ -135,10 +187,16 @@ class FirebaseFirestoreService {
     String? productId,
     DateTime? expiryDate,
   }) async {
+    final subscriptionsCollection = subscriptions;
+    if (subscriptionsCollection == null) {
+      debugPrint('❌ [Firestore] Firebase not initialized');
+      return;
+    }
+    
     try {
       debugPrint('💾 [Firestore] Saving subscription for user: $userId');
       
-      await subscriptions.doc(userId).set({
+      await subscriptionsCollection.doc(userId).set({
         'userId': userId,
         'isPremium': isPremium,
         'purchaseId': purchaseId,
@@ -156,10 +214,16 @@ class FirebaseFirestoreService {
 
   /// Get subscription status
   Future<Map<String, dynamic>?> getSubscription(String userId) async {
+    final subscriptionsCollection = subscriptions;
+    if (subscriptionsCollection == null) {
+      debugPrint('❌ [Firestore] Firebase not initialized');
+      return null;
+    }
+    
     try {
       debugPrint('📖 [Firestore] Getting subscription for user: $userId');
       
-      final doc = await subscriptions.doc(userId).get();
+      final doc = await subscriptionsCollection.doc(userId).get();
       
       if (doc.exists) {
         debugPrint('✅ [Firestore] Subscription found');
@@ -176,9 +240,15 @@ class FirebaseFirestoreService {
 
   /// Stream subscription status
   Stream<Map<String, dynamic>?> streamSubscription(String userId) {
+    final subscriptionsCollection = subscriptions;
+    if (subscriptionsCollection == null) {
+      debugPrint('❌ [Firestore] Firebase not initialized');
+      return Stream.value(null);
+    }
+    
     debugPrint('📊 [Firestore] Streaming subscription for user: $userId');
     
-    return subscriptions.doc(userId).snapshots().map((doc) {
+    return subscriptionsCollection.doc(userId).snapshots().map((doc) {
       if (doc.exists) {
         return doc.data() as Map<String, dynamic>?;
       }
@@ -188,14 +258,23 @@ class FirebaseFirestoreService {
 
   /// Delete user data (for account deletion)
   Future<void> deleteUserData(String userId) async {
+    final usersCollection = users;
+    final readingsCollection = readings;
+    final subscriptionsCollection = subscriptions;
+    
+    if (usersCollection == null || readingsCollection == null || subscriptionsCollection == null) {
+      debugPrint('❌ [Firestore] Firebase not initialized');
+      return;
+    }
+    
     try {
       debugPrint('🗑️ [Firestore] Deleting all data for user: $userId');
       
       // Delete user profile
-      await users.doc(userId).delete();
+      await usersCollection.doc(userId).delete();
       
       // Delete all readings
-      final readingsSnapshot = await readings
+      final readingsSnapshot = await readingsCollection
           .where('userId', isEqualTo: userId)
           .get();
       
@@ -204,7 +283,7 @@ class FirebaseFirestoreService {
       }
       
       // Delete subscription
-      await subscriptions.doc(userId).delete();
+      await subscriptionsCollection.doc(userId).delete();
 
       debugPrint('✅ [Firestore] User data deleted');
     } catch (e) {
@@ -218,13 +297,21 @@ class FirebaseFirestoreService {
     required String userId,
     required List<TempReading> readingsList,
   }) async {
+    final firestore = _firestoreInstance;
+    final readingsCollection = readings;
+    
+    if (firestore == null || readingsCollection == null) {
+      debugPrint('❌ [Firestore] Firebase not initialized');
+      return;
+    }
+    
     try {
       debugPrint('💾 [Firestore] Batch saving ${readingsList.length} readings');
       
-      final batch = _firestore.batch();
+      final batch = firestore.batch();
       
       for (var reading in readingsList) {
-        final docRef = readings.doc();
+        final docRef = readingsCollection.doc();
         batch.set(docRef, {
           'userId': userId,
           'temperature': reading.temperature,
@@ -244,10 +331,21 @@ class FirebaseFirestoreService {
 
   /// Get statistics for user
   Future<Map<String, dynamic>> getUserStats(String userId) async {
+    final readingsCollection = readings;
+    if (readingsCollection == null) {
+      debugPrint('❌ [Firestore] Firebase not initialized');
+      return {
+        'totalReadings': 0,
+        'avgTemp': 0.0,
+        'maxTemp': 0.0,
+        'minTemp': 0.0,
+      };
+    }
+    
     try {
       debugPrint('📊 [Firestore] Getting stats for user: $userId');
       
-      final snapshot = await readings
+      final snapshot = await readingsCollection
           .where('userId', isEqualTo: userId)
           .orderBy('timestamp', descending: true)
           .limit(1000)

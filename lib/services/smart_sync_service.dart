@@ -173,10 +173,16 @@ class SmartSyncService {
     Map<String, Map<String, dynamic>> hourlyAggregates,
     Map<String, Map<String, dynamic>> dailyAggregates,
   ) async {
+    final usersCollection = _firestore.users;
+    if (usersCollection == null) {
+      debugPrint('   ⚠️  Firebase not initialized, skipping aggregate upload');
+      return;
+    }
+    
     try {
       // Upload hourly aggregates
       for (var entry in hourlyAggregates.entries) {
-        await _firestore.users
+        await usersCollection
             .doc(userId)
             .collection('hourly_aggregates')
             .doc(entry.key)
@@ -185,7 +191,7 @@ class SmartSyncService {
       
       // Upload daily aggregates
       for (var entry in dailyAggregates.entries) {
-        await _firestore.users
+        await usersCollection
             .doc(userId)
             .collection('daily_aggregates')
             .doc(entry.key)
@@ -225,10 +231,16 @@ class SmartSyncService {
   }) async {
     if (!_auth.isSignedIn) return [];
     
+    final usersCollection = _firestore.users;
+    if (usersCollection == null) {
+      debugPrint('⚠️  [SmartSync] Firebase not initialized');
+      return [];
+    }
+    
     try {
       final userId = _auth.currentUser!.uid;
       
-      final snapshot = await _firestore.users
+      final snapshot = await usersCollection
           .doc(userId)
           .collection('hourly_aggregates')
           .where('timestamp', isGreaterThanOrEqualTo: startDate)
@@ -250,10 +262,16 @@ class SmartSyncService {
   }) async {
     if (!_auth.isSignedIn) return [];
     
+    final usersCollection = _firestore.users;
+    if (usersCollection == null) {
+      debugPrint('⚠️  [SmartSync] Firebase not initialized');
+      return [];
+    }
+    
     try {
       final userId = _auth.currentUser!.uid;
       
-      final snapshot = await _firestore.users
+      final snapshot = await usersCollection
           .doc(userId)
           .collection('daily_aggregates')
           .where('timestamp', isGreaterThanOrEqualTo: startDate)

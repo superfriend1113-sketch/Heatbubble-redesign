@@ -75,20 +75,50 @@ class SubscriptionService {
   }
 
   Future<void> _initializeProducts() async {
+    debugPrint('═══════════════════════════════════════════════════════');
+    debugPrint('🛒 [Subscription] Initializing In-App Products...');
+    debugPrint('   Product IDs to query: $_allProductIds');
+    
     final bool available = await iap.isAvailable();
+    debugPrint('   IAP Available: $available');
+    
     if (!available) {
       debugPrint('⚠️  [Subscription] In-App Purchase not available on this device');
+      debugPrint('═══════════════════════════════════════════════════════');
       return;
     }
 
     try {
       final ProductDetailsResponse response =
           await iap.queryProductDetails(_allProductIds);
-      _products = response.productDetails;
-      debugPrint('✅ [Subscription] Products loaded: ${_products.map((p) => p.id).toList()}');
-      if (response.notFoundIDs.isNotEmpty) {
-        debugPrint('⚠️  [Subscription] Not found in Play Console: ${response.notFoundIDs}');
+      
+      // Filter out "Free" trial entries - keep only products with actual prices
+      _products = response.productDetails.where((product) {
+        return !product.price.toLowerCase().contains('free') && 
+               product.price.isNotEmpty &&
+               product.price != '0';
+      }).toList();
+      
+      debugPrint('✅ [Subscription] Query completed');
+      debugPrint('   Products found: ${_products.length} (filtered from ${response.productDetails.length})');
+      
+      for (var product in _products) {
+        debugPrint('   ├─ ID: ${product.id}');
+        debugPrint('   │  Title: ${product.title}');
+        debugPrint('   │  Price: ${product.price}');
+        debugPrint('   │  Description: ${product.description}');
       }
+      
+      if (response.notFoundIDs.isNotEmpty) {
+        debugPrint('⚠️  [Subscription] Products NOT FOUND in Play Console:');
+        for (var id in response.notFoundIDs) {
+          debugPrint('   ✗ $id');
+        }
+        debugPrint('   → Check Play Console: Monetize → Subscriptions');
+        debugPrint('   → Ensure products are published (at least to Internal Testing)');
+      }
+      
+      debugPrint('═══════════════════════════════════════════════════════');
     } catch (e) {
       debugPrint('❌ [Subscription] Error loading products: $e');
     }
@@ -198,12 +228,22 @@ class SubscriptionService {
   // ── Restore & validate ──────────────────────────────────────────────────
 
   /// Restores purchases — use when user reinstalls or switches device.
-  Future<void> restorePurchases() async {
+  Future<bool> restorePurchases() async {
+    debugPrint('🔄 [Subscription] Starting restore purchases...');
+    
     try {
+      // Restore purchases triggers Google Play to refresh purchase state
       await iap.restorePurchases();
+      
+      // Reload premium status from local storage
       await _loadPremiumStatus();
+      
+      debugPrint('✅ [Subscription] Restore complete - isPremium: $_isPremium');
+      return _isPremium;
+      
     } catch (e) {
-      debugPrint('❌ [Subscription] Restore error: $e');
+      debugPrint('❌ [Subscription] Restore failed: $e');
+      return false;
     }
   }
 

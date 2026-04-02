@@ -7,17 +7,38 @@ class FirebaseAuthService {
   factory FirebaseAuthService() => _instance;
   FirebaseAuthService._internal();
 
-  final FirebaseAuth _auth = FirebaseAuth.instance;
+  FirebaseAuth? _auth;
   final GoogleSignIn _googleSignIn = GoogleSignIn();
 
+  // Lazy-initialize Firebase Auth (only when Firebase is ready)
+  FirebaseAuth? get _authInstance {
+    try {
+      _auth ??= FirebaseAuth.instance;
+      return _auth;
+    } catch (e) {
+      debugPrint('⚠️  [Auth] Firebase not initialized yet: $e');
+      return null;
+    }
+  }
+
   // Current user stream
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  Stream<User?> get authStateChanges {
+    final auth = _authInstance;
+    if (auth == null) return Stream.value(null);
+    return auth.authStateChanges();
+  }
   
   // Current user
-  User? get currentUser => _auth.currentUser;
+  User? get currentUser {
+    final auth = _authInstance;
+    return auth?.currentUser;
+  }
   
   // Check if user is signed in
-  bool get isSignedIn => _auth.currentUser != null;
+  bool get isSignedIn {
+    final auth = _authInstance;
+    return auth?.currentUser != null;
+  }
 
   /// Sign up with email and password
   Future<UserCredential?> signUpWithEmail({
@@ -25,10 +46,16 @@ class FirebaseAuthService {
     required String password,
     String? displayName,
   }) async {
+    final auth = _authInstance;
+    if (auth == null) {
+      debugPrint('❌ [Auth] Firebase not initialized');
+      return null;
+    }
+    
     try {
       debugPrint('🔐 [Auth] Signing up user: $email');
       
-      final credential = await _auth.createUserWithEmailAndPassword(
+      final credential = await auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -55,10 +82,16 @@ class FirebaseAuthService {
     required String email,
     required String password,
   }) async {
+    final auth = _authInstance;
+    if (auth == null) {
+      debugPrint('❌ [Auth] Firebase not initialized');
+      return null;
+    }
+    
     try {
       debugPrint('🔐 [Auth] Signing in user: $email');
       
-      final credential = await _auth.signInWithEmailAndPassword(
+      final credential = await auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
@@ -73,6 +106,12 @@ class FirebaseAuthService {
 
   /// Sign in with Google
   Future<UserCredential?> signInWithGoogle() async {
+    final auth = _authInstance;
+    if (auth == null) {
+      debugPrint('❌ [Auth] Firebase not initialized');
+      return null;
+    }
+    
     try {
       debugPrint('🔐 [Auth] Starting Google Sign-In');
       
@@ -96,7 +135,7 @@ class FirebaseAuthService {
       );
 
       // Sign in to Firebase with the Google credential
-      final userCredential = await _auth.signInWithCredential(credential);
+      final userCredential = await auth.signInWithCredential(credential);
       
       debugPrint('✅ [Auth] Google Sign-In successful: ${userCredential.user?.uid}');
       return userCredential;
@@ -111,10 +150,16 @@ class FirebaseAuthService {
 
   /// Sign in anonymously
   Future<UserCredential?> signInAnonymously() async {
+    final auth = _authInstance;
+    if (auth == null) {
+      debugPrint('❌ [Auth] Firebase not initialized');
+      return null;
+    }
+    
     try {
       debugPrint('🔐 [Auth] Signing in anonymously');
       
-      final credential = await _auth.signInAnonymously();
+      final credential = await auth.signInAnonymously();
 
       debugPrint('✅ [Auth] Anonymous sign in successful: ${credential.user?.uid}');
       return credential;
@@ -126,6 +171,12 @@ class FirebaseAuthService {
 
   /// Sign out
   Future<void> signOut() async {
+    final auth = _authInstance;
+    if (auth == null) {
+      debugPrint('❌ [Auth] Firebase not initialized');
+      return;
+    }
+    
     try {
       debugPrint('🔐 [Auth] Signing out user');
       
@@ -135,7 +186,7 @@ class FirebaseAuthService {
         debugPrint('✅ [Auth] Google Sign-Out successful');
       }
       
-      await _auth.signOut();
+      await auth.signOut();
       debugPrint('✅ [Auth] Sign out successful');
     } catch (e) {
       debugPrint('❌ [Auth] Sign out failed: $e');
@@ -145,9 +196,15 @@ class FirebaseAuthService {
 
   /// Send password reset email
   Future<void> sendPasswordResetEmail(String email) async {
+    final auth = _authInstance;
+    if (auth == null) {
+      debugPrint('❌ [Auth] Firebase not initialized');
+      return;
+    }
+    
     try {
       debugPrint('📧 [Auth] Sending password reset email to: $email');
-      await _auth.sendPasswordResetEmail(email: email);
+      await auth.sendPasswordResetEmail(email: email);
       debugPrint('✅ [Auth] Password reset email sent');
     } on FirebaseAuthException catch (e) {
       debugPrint('❌ [Auth] Password reset failed: ${e.code} - ${e.message}');
@@ -157,8 +214,14 @@ class FirebaseAuthService {
 
   /// Delete current user account
   Future<void> deleteAccount() async {
+    final auth = _authInstance;
+    if (auth == null) {
+      debugPrint('❌ [Auth] Firebase not initialized');
+      return;
+    }
+    
     try {
-      final user = _auth.currentUser;
+      final user = auth.currentUser;
       if (user == null) {
         throw Exception('No user signed in');
       }
@@ -177,8 +240,14 @@ class FirebaseAuthService {
     String? displayName,
     String? photoURL,
   }) async {
+    final auth = _authInstance;
+    if (auth == null) {
+      debugPrint('❌ [Auth] Firebase not initialized');
+      return;
+    }
+    
     try {
-      final user = _auth.currentUser;
+      final user = auth.currentUser;
       if (user == null) {
         throw Exception('No user signed in');
       }

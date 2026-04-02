@@ -500,7 +500,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Widget _unitPill(String label, TempUnit? unit, UnitService us) {
     final isActive = unit != null && us.unit == unit;
     return GestureDetector(
-      onTap: unit != null ? () => us.setUnit(unit) : null,
+      onTap: unit != null ? () {
+        // Show interstitial ad once per screen for free users
+        if (!_subscription.isPremium) {
+          _ads.showInterstitialAdForScreen('home');
+        }
+        us.setUnit(unit);
+      } : null,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
@@ -598,7 +604,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
 /// Set to true during development so you can see the widget banner and test the
 /// feature without purchasing premium. Flip to false before releasing.
-const bool kDevHomeWidgetBypass = true;
+const bool kDevHomeWidgetBypass = false;
 
 class _HomeWidgetPromoCard extends StatelessWidget {
   final bool isPremium;

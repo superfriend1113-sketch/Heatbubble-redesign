@@ -68,7 +68,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.of(context).pop();
+          // Pop both signup and login screens to return to settings
+          Navigator.of(context)..pop()..pop();
         }
       }
     } on FirebaseAuthException catch (e) {
@@ -136,7 +137,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
               backgroundColor: Colors.green,
             ),
           );
-          Navigator.of(context).pop();
+          // Pop both signup and login screens to return to settings
+          Navigator.of(context)..pop()..pop();
         }
       }
     } on FirebaseAuthException catch (e) {

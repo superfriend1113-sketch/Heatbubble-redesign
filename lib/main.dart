@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -14,17 +15,19 @@ import 'services/firebase_init_service.dart';
 import 'services/firebase_auth_service.dart';
 import 'services/subscription_service.dart';
 import 'services/home_widget_service.dart';
+import 'services/ads_service.dart';
 import 'screens/onboarding_screen.dart';
 import 'app.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Check if onboarding has been completed
+  // ── ONLY CRITICAL BLOCKING OPERATIONS ──
+  // Check if onboarding has been completed (fast, local read)
   final prefs = await SharedPreferences.getInstance();
   final bool onboardingCompleted = prefs.getBool('onboarding_completed') ?? false;
 
-  // Set system UI styles synchronously (no await needed)
+  // Set system UI styles (synchronous, instant)
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -35,42 +38,75 @@ void main() async {
     ),
   );
 
-  // ── OPTIMIZED: Parallelize independent initialization tasks ──────────────
-  // Initialize timezone database first (required for scheduled notifications)
+  // Initialize timezone database (synchronous, fast)
   tz.initializeTimeZones();
-  tz.setLocalLocation(tz.getLocation('America/New_York')); // Default timezone
-  
-  // Run all independent async operations concurrently
-  await Future.wait([
-    // Initialize Mobile Ads SDK
-    _initializeMobileAds(),
-    // Load persisted temperature unit
-    UnitService.instance.load(),
-    // Initialize notifications
-    NudgeService.init(),
-    // Request notification permission (Android 13+)
-    Permission.notification.request(),
-    // Initialize background polling
-    _initializeBackgroundWork(),
-    // Initialize home screen widget
-    HomeWidgetService.init(),
-  ]);
-  
-  // Schedule daily reminder if enabled
-  await NudgeService().scheduleDailyReminder();
-  
-  // Initialize Firebase (optional - won't block if not configured)
-  try {
-    await FirebaseInitService().initialize();
-    
-    // Sync subscription status from Firebase if user is logged in
-    await _syncSubscriptionFromFirebase();
-  } catch (e) {
-    debugPrint('⚠️  [Init] Firebase not configured yet: $e');
-    debugPrint('   App will work without Firebase features');
-  }
+  tz.setLocalLocation(tz.getLocation('America/New_York'));
 
+  // ── LAUNCH APP IMMEDIATELY ──
   runApp(HeatBubbleApp(showOnboarding: !onboardingCompleted));
+
+  // ── ALL OTHER INITIALIZATION HAPPENS IN BACKGROUND ──
+  _initializeInBackground();
+}
+
+/// Initialize all non-critical services in the background after app launch
+void _initializeInBackground() {
+  Future.microtask(() async {
+    debugPrint('🚀 [Init] Starting background initialization...');
+    
+    try {
+      // Run all independent async operations concurrently
+      await Future.wait([
+        // Initialize Mobile Ads SDK
+        _initializeMobileAds(),
+        // Load persisted temperature unit
+        UnitService.instance.load(),
+        // Initialize notifications
+        NudgeService.init(),
+        // Request notification permission (Android 13+)
+        Permission.notification.request(),
+        // Initialize background polling
+        _initializeBackgroundWork(),
+        // Initialize home screen widget
+        HomeWidgetService.init(),
+      ]);
+      
+      debugPrint('✅ [Init] Core services initialized');
+      
+      // Initialize Firebase (optional - won't block if not configured)
+      try {
+        await FirebaseInitService().initialize().timeout(
+          const Duration(seconds: 5),
+          onTimeout: () {
+            debugPrint('⚠️  [Init] Firebase initialization timed out after 5s');
+            throw TimeoutException('Firebase init timeout');
+          },
+        );
+        
+        // Sync subscription status from Firebase if user is logged in
+        await _syncSubscriptionFromFirebase().timeout(
+          const Duration(seconds: 3),
+          onTimeout: () {
+            debugPrint('⚠️  [Init] Firebase sync timed out after 3s');
+          },
+        );
+      } catch (e) {
+        debugPrint('⚠️  [Init] Firebase not configured yet: $e');
+        debugPrint('   App will work without Firebase features');
+      }
+
+      // Schedule daily reminder
+      await NudgeService().scheduleDailyReminder();
+      debugPrint('✅ [Init] All background initialization complete');
+      
+      // Show app open ad AFTER everything is initialized (once per session, for free users)
+      await _showAppOpenAdIfNeeded();
+      
+    } catch (e, stackTrace) {
+      debugPrint('❌ [Init] Background initialization error: $e');
+      debugPrint('   Stack trace: $stackTrace');
+    }
+  });
 }
 
 /// Initialize Mobile Ads SDK with test device configuration
@@ -96,6 +132,36 @@ Future<void> _initializeMobileAds() async {
     debugPrint('[Init] ❌ ERROR initializing Mobile Ads');
     debugPrint('[Init] Exception: $e');
     debugPrint('[Init] Stack trace: $stackTrace');
+    debugPrint('═══════════════════════════════════════════════════════');
+  }
+}
+
+/// Show app open ad for free users (once per session)
+Future<void> _showAppOpenAdIfNeeded() async {
+  try {
+    final subscription = SubscriptionService();
+    final ads = AdsService();
+    
+    debugPrint('═══════════════════════════════════════════════════════');
+    debugPrint('🚀 [Init] Checking if app open ad should show...');
+    debugPrint('   - isPremium: ${subscription.isPremium}');
+    
+    // Only show for free users
+    if (!subscription.isPremium) {
+      // Wait 2 seconds for app to settle and UI to be ready
+      debugPrint('   - Waiting 2 seconds for app to settle...');
+      await Future.delayed(const Duration(seconds: 2));
+      
+      debugPrint('   - Attempting to show app open ad...');
+      await ads.showAppOpenAd();
+      debugPrint('   - App open ad flow completed');
+    } else {
+      debugPrint('   - User is premium, skipping app open ad');
+    }
+    debugPrint('═══════════════════════════════════════════════════════');
+  } catch (e) {
+    debugPrint('═══════════════════════════════════════════════════════');
+    debugPrint('⚠️  [Init] Failed to show app open ad: $e');
     debugPrint('═══════════════════════════════════════════════════════');
   }
 }

@@ -7,6 +7,7 @@ import '../services/firebase_auth_service.dart';
 import '../services/firebase_sync_service.dart';
 import '../services/firebase_firestore_service.dart';
 import '../services/nudge_service.dart';
+import '../services/ads_service.dart';
 import '../screens/paywall_screen.dart';
 import '../screens/custom_alerts_screen.dart';
 import '../screens/auth/login_screen.dart';
@@ -30,6 +31,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _auth = FirebaseAuthService();
   final _sync = FirebaseSyncService();
   final _firestore = FirebaseFirestoreService();
+  final _ads = AdsService();
   
   bool _isSyncing = false;
   Map<String, dynamic>? _cloudStats;
@@ -150,6 +152,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       _showMessage('Sign out failed: $e');
+    }
+  }
+
+  Future<void> _restorePurchases() async {
+    try {
+      _showMessage('Restoring purchases...', isError: false);
+      
+      final success = await _subscription.restorePurchases();
+      
+      if (!mounted) return;
+      
+      if (success) {
+        _showMessage('Premium restored successfully! 🎉', isError: false);
+        setState(() {}); // Refresh UI
+      } else {
+        _showMessage('No active subscriptions found', isError: true);
+      }
+    } catch (e) {
+      if (!mounted) return;
+      _showMessage('Failed to restore purchases', isError: true);
     }
   }
 
@@ -477,7 +499,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
-                        onPressed: () => _subscription.restorePurchases(),
+                        onPressed: _restorePurchases,
                         style: OutlinedButton.styleFrom(
                           foregroundColor: const Color(0xFF111827),
                           side: const BorderSide(color: Color(0xFF111827)),
@@ -613,7 +635,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'Enable Notifications',
                     subtitle: 'Receive app notifications',
                     value: _notificationsEnabled,
-                    onChanged: (v) {
+                    onChanged: (v) async {
+                      // Show interstitial ad once per screen for free users
+                      if (!_subscription.isPremium) {
+                        await _ads.showInterstitialAdForScreen('settings');
+                      }
+                      
                       setState(() => _notificationsEnabled = v);
                       _saveNotificationPreference('notifications_enabled', v);
                     },
@@ -626,7 +653,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       title: 'Temperature Alerts',
                       subtitle: 'Alert when temperature is extreme',
                       value: _temperatureAlerts,
-                      onChanged: (v) {
+                      onChanged: (v) async {
+                        // Show interstitial ad once per screen for free users
+                        if (!_subscription.isPremium) {
+                          await _ads.showInterstitialAdForScreen('settings');
+                        }
+                        
                         setState(() => _temperatureAlerts = v);
                         _saveNotificationPreference('temperature_alerts', v);
                       },
@@ -636,7 +668,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       title: 'Trend Alerts',
                       subtitle: 'Alert on significant temperature changes',
                       value: _trendAlerts,
-                      onChanged: (v) {
+                      onChanged: (v) async {
+                        // Show interstitial ad once per screen for free users
+                        if (!_subscription.isPremium) {
+                          await _ads.showInterstitialAdForScreen('settings');
+                        }
+                        
                         setState(() => _trendAlerts = v);
                         _saveNotificationPreference('trend_alerts', v);
                       },
@@ -647,6 +684,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       subtitle: 'Remind to check temperature daily',
                       value: _dailyReminders,
                       onChanged: (v) async {
+                        // Show interstitial ad once per screen for free users
+                        if (!_subscription.isPremium) {
+                          await _ads.showInterstitialAdForScreen('settings');
+                        }
+                        
                         setState(() => _dailyReminders = v);
                         await _saveNotificationPreference('daily_reminders', v);
                         // Schedule or cancel daily reminder
@@ -683,14 +725,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'Auto-detect sensors',
                     subtitle: 'Automatically use available sensors',
                     value: _autoDetectSensors,
-                    onChanged: (v) => setState(() => _autoDetectSensors = v),
+                    onChanged: (v) async {
+                      // Show interstitial ad once per screen for free users
+                      if (!_subscription.isPremium) {
+                        await _ads.showInterstitialAdForScreen('settings');
+                      }
+                      
+                      setState(() => _autoDetectSensors = v);
+                    },
                   ),
                   const SizedBox(height: 8),
                   _toggleRow(
                     title: 'Battery fallback',
                     subtitle: 'Use battery temp when needed',
                     value: _batteryFallback,
-                    onChanged: (v) => setState(() => _batteryFallback = v),
+                    onChanged: (v) async {
+                      // Show interstitial ad once per screen for free users
+                      if (!_subscription.isPremium) {
+                        await _ads.showInterstitialAdForScreen('settings');
+                      }
+                      
+                      setState(() => _batteryFallback = v);
+                    },
                   ),
                 ],
               ),
@@ -766,7 +822,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }) {
     final isActive = us.unit == unit;
     return GestureDetector(
-      onTap: () => us.setUnit(unit),
+      onTap: () async {
+        // Show interstitial ad once per screen for free users
+        if (!_subscription.isPremium) {
+          await _ads.showInterstitialAdForScreen('settings');
+        }
+        
+        // Set the unit
+        us.setUnit(unit);
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         width: double.infinity,

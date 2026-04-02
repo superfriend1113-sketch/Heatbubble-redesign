@@ -239,7 +239,7 @@ class PremiumUpgradePrompt extends StatelessWidget {
               ),
               onPressed: () => _showPaywall(context),
               child: const Text(
-                'Upgrade - \$2.99',
+                'Upgrade - Starting at \$1.99/mo',
                 style: TextStyle(
                   color: Color(0xFFFF6B35),
                   fontWeight: FontWeight.bold,

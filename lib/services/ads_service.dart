@@ -11,19 +11,35 @@ class AdsService {
   // These are official Google test IDs that always return test ads
   // Banner Test ID:
   static const String _bannerAdUnitId = 'ca-app-pub-3940256099942544/6300978111';
+  // Interstitial Test ID:
+  static const String _interstitialAdUnitId = 'ca-app-pub-3940256099942544/1033173712';
+  // App Open Test ID:
+  static const String _appOpenAdUnitId = 'ca-app-pub-3940256099942544/9257395921';
   
   // TODO: For production, replace with your real AdMob IDs:
   // App ID (AndroidManifest.xml): ca-app-pub-3676471973768636~4261706101
   // Banner ID: ca-app-pub-3676471973768636/2948624436
+  // Interstitial ID: ca-app-pub-3676471973768636/XXXXXXXXXX
+  // App Open ID: ca-app-pub-3676471973768636/XXXXXXXXXX
 
   // ── Internal state ─────────────────────────────────────────────────────────
   BannerAd? _bannerAd;
+  InterstitialAd? _interstitialAd;
+  AppOpenAd? _appOpenAd;
+  
   bool _isAdLoaded   = false;
   bool _isInitialized = false;
   bool _isLoading    = false;   // guard: prevents concurrent load calls
   int  _swipeAwayCount = 0;
   int  _loadAttempts = 0;
   String? _lastError;
+  
+  // Session tracking for one-time ads
+  bool _interstitialShownThisSession = false;
+  bool _appOpenShownThisSession = false;
+  
+  // Per-screen tracking for interstitial ads
+  final Set<String> _interstitialShownScreens = {};
 
   /// Listener called whenever ad state changes (loaded / failed / disposed).
   /// Widgets should set this to `() { if (mounted) setState(() {}); }`.
@@ -41,8 +57,14 @@ class AdsService {
     debugPrint('🎯 [AdsService] Initializing ads service');
     debugPrint('   - Using Google test IDs (work on all devices)');
     debugPrint('   - Banner Unit: $_bannerAdUnitId');
+    debugPrint('   - Interstitial Unit: $_interstitialAdUnitId');
+    debugPrint('   - App Open Unit: $_appOpenAdUnitId');
     debugPrint('═══════════════════════════════════════════════════════');
     _isInitialized = true;
+    
+    // Preload interstitial and app open ads
+    loadInterstitialAd();
+    loadAppOpenAd();
   }
 
   /// Load a banner ad.  Safe to call multiple times (no-ops if already loading
@@ -216,5 +238,211 @@ class AdsService {
       height: _bannerAd!.size.height.toDouble(),
       child:  AdWidget(ad: _bannerAd!),
     );
+  }
+
+  // ── Interstitial Ad (once per session) ────────────────────────────────────
+
+  /// Load interstitial ad (call this early, like in init)
+  Future<void> loadInterstitialAd() async {
+    if (_interstitialAd != null) {
+      debugPrint('⚠️  [AdsService] Interstitial already loaded');
+      return;
+    }
+
+    debugPrint('🎬 [AdsService] Loading interstitial ad...');
+    
+    try {
+      await InterstitialAd.load(
+        adUnitId: _interstitialAdUnitId,
+        request: const AdRequest(),
+        adLoadCallback: InterstitialAdLoadCallback(
+          onAdLoaded: (ad) {
+            debugPrint('✅ [AdsService] Interstitial ad loaded');
+            _interstitialAd = ad;
+            
+            ad.fullScreenContentCallback = FullScreenContentCallback(
+              onAdDismissedFullScreenContent: (ad) {
+                debugPrint('👋 [AdsService] Interstitial dismissed');
+                ad.dispose();
+                _interstitialAd = null;
+              },
+              onAdFailedToShowFullScreenContent: (ad, error) {
+                debugPrint('❌ [AdsService] Interstitial failed to show: $error');
+                ad.dispose();
+                _interstitialAd = null;
+              },
+            );
+          },
+          onAdFailedToLoad: (error) {
+            debugPrint('❌ [AdsService] Interstitial failed to load: $error');
+            _interstitialAd = null;
+          },
+        ),
+      );
+    } catch (e) {
+      debugPrint('💥 [AdsService] Interstitial exception: $e');
+    }
+  }
+
+  /// Show interstitial ad (only once per session)
+  Future<void> showInterstitialAd() async {
+    if (_interstitialShownThisSession) {
+      debugPrint('⚠️  [AdsService] Interstitial already shown this session');
+      return;
+    }
+
+    if (_interstitialAd == null) {
+      debugPrint('⚠️  [AdsService] Interstitial not loaded, loading now...');
+      await loadInterstitialAd();
+      // Wait a moment for it to load
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    if (_interstitialAd != null) {
+      debugPrint('🎬 [AdsService] Showing interstitial ad');
+      _interstitialShownThisSession = true;
+      await _interstitialAd!.show();
+      _interstitialAd = null;
+    } else {
+      debugPrint('⚠️  [AdsService] Interstitial still not ready');
+    }
+  }
+
+  /// Show interstitial ad per screen (once per screen per session)
+  /// [screenId] should be unique per screen (e.g., 'home', 'settings')
+  Future<void> showInterstitialAdForScreen(String screenId) async {
+    if (_interstitialShownScreens.contains(screenId)) {
+      debugPrint('⚠️  [AdsService] Interstitial already shown for screen: $screenId');
+      return;
+    }
+
+    debugPrint('🎬 [AdsService] Attempting to show interstitial for screen: $screenId');
+
+    if (_interstitialAd == null) {
+      debugPrint('⚠️  [AdsService] Interstitial not loaded, loading now...');
+      await loadInterstitialAd();
+      // Wait a moment for it to load
+      await Future.delayed(const Duration(milliseconds: 500));
+    }
+
+    if (_interstitialAd != null) {
+      debugPrint('✅ [AdsService] Showing interstitial ad for screen: $screenId');
+      _interstitialShownScreens.add(screenId);
+      await _interstitialAd!.show();
+      _interstitialAd = null;
+      
+      // Preload next ad
+      loadInterstitialAd();
+    } else {
+      debugPrint('⚠️  [AdsService] Interstitial still not ready for screen: $screenId');
+    }
+  }
+
+  // ── App Open Ad (once per session) ────────────────────────────────────────
+
+  /// Load app open ad
+  Future<void> loadAppOpenAd() async {
+    if (_appOpenAd != null) {
+      debugPrint('⚠️  [AdsService] App open ad already loaded');
+      return;
+    }
+
+    debugPrint('═══════════════════════════════════════════════════════');
+    debugPrint('🚀 [AdsService] Loading app open ad...');
+    debugPrint('   - Ad Unit ID: $_appOpenAdUnitId');
+    
+    try {
+      await AppOpenAd.load(
+        adUnitId: _appOpenAdUnitId,
+        request: const AdRequest(),
+        adLoadCallback: AppOpenAdLoadCallback(
+          onAdLoaded: (ad) {
+            debugPrint('✅ [AdsService] App open ad loaded successfully');
+            _appOpenAd = ad;
+            
+            ad.fullScreenContentCallback = FullScreenContentCallback(
+              onAdShowedFullScreenContent: (ad) {
+                debugPrint('👁️  [AdsService] App open ad showed full screen');
+              },
+              onAdDismissedFullScreenContent: (ad) {
+                debugPrint('👋 [AdsService] App open ad dismissed by user');
+                ad.dispose();
+                _appOpenAd = null;
+              },
+              onAdFailedToShowFullScreenContent: (ad, error) {
+                debugPrint('❌ [AdsService] App open ad failed to show: $error');
+                ad.dispose();
+                _appOpenAd = null;
+              },
+              onAdImpression: (ad) {
+                debugPrint('💰 [AdsService] App open ad impression recorded');
+              },
+            );
+          },
+          onAdFailedToLoad: (error) {
+            debugPrint('❌ [AdsService] App open ad failed to load');
+            debugPrint('   - Error Code: ${error.code}');
+            debugPrint('   - Error Domain: ${error.domain}');
+            debugPrint('   - Error Message: ${error.message}');
+            _appOpenAd = null;
+          },
+        ),
+      );
+    } catch (e) {
+      debugPrint('💥 [AdsService] App open ad exception: $e');
+      _appOpenAd = null;
+    }
+    debugPrint('═══════════════════════════════════════════════════════');
+  }
+
+  /// Show app open ad (only once per session)
+  Future<void> showAppOpenAd() async {
+    if (_appOpenShownThisSession) {
+      debugPrint('⚠️  [AdsService] App open ad already shown this session');
+      return;
+    }
+
+    debugPrint('═══════════════════════════════════════════════════════');
+    debugPrint('🚀 [AdsService] Attempting to show app open ad...');
+    debugPrint('   - Ad loaded: ${_appOpenAd != null}');
+    
+    // If not loaded, try to load it
+    if (_appOpenAd == null) {
+      debugPrint('   - App open ad not loaded, loading now...');
+      await loadAppOpenAd();
+      
+      // Wait up to 8 seconds for it to load (more time for slow networks)
+      int attempts = 0;
+      while (_appOpenAd == null && attempts < 16) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        attempts++;
+        if (attempts % 4 == 0) {
+          debugPrint('   - Still waiting for app open ad... ${attempts * 500}ms elapsed');
+        }
+      }
+    }
+
+    if (_appOpenAd != null) {
+      debugPrint('✅ [AdsService] App open ad ready, showing now...');
+      _appOpenShownThisSession = true;
+      await _appOpenAd!.show();
+      _appOpenAd = null;
+      debugPrint('✅ [AdsService] App open ad shown successfully');
+    } else {
+      debugPrint('❌ [AdsService] App open ad still not ready after 8 seconds');
+      debugPrint('   - Possible reasons:');
+      debugPrint('     • Slow network connection');
+      debugPrint('     • AdMob server issues');
+      debugPrint('     • No ad inventory available');
+    }
+    debugPrint('═══════════════════════════════════════════════════════');
+  }
+
+  /// Reset session flags (call this if you want to allow ads again in same session)
+  void resetSession() {
+    _interstitialShownThisSession = false;
+    _appOpenShownThisSession = false;
+    _interstitialShownScreens.clear();
+    debugPrint('🔄 [AdsService] Session reset - ads can show again');
   }
 }

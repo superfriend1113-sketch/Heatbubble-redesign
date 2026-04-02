@@ -125,15 +125,33 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
   }
 
   Future<void> _restorePurchases() async {
+    if (_isLoading) return;
+    
     setState(() => _isLoading = true);
     
     try {
-      await _iap.restorePurchases();
-      _showSuccess('Purchases restored successfully');
+      final success = await _subscription.restorePurchases();
+      
+      if (!mounted) return;
+      
+      if (success) {
+        _showSuccess('Premium restored successfully! 🎉');
+        // Wait a moment then close the paywall
+        await Future.delayed(const Duration(seconds: 1));
+        if (mounted) {
+          Navigator.pop(context, true);
+        }
+      } else {
+        _showError('No active subscriptions found. Purchase a plan to continue.');
+      }
     } catch (e) {
-      _showError('Failed to restore purchases: $e');
+      if (!mounted) return;
+      _showError('Failed to restore purchases. Please try again.');
+      debugPrint('❌ [Paywall] Restore error: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -264,25 +282,6 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
                           color: Colors.grey[600],
                         ),
                       ),
-                      const SizedBox(height: 8),
-                      // 7-day trial badge
-                      Container(
-                        margin: const EdgeInsets.only(top: 4, bottom: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF6B35).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: const Color(0xFFFF6B35).withValues(alpha: 0.3)),
-                        ),
-                        child: const Text(
-                          '7-day free trial for new subscribers',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: Color(0xFFFF6B35),
-                          ),
-                        ),
-                      ),
                       const SizedBox(height: 32),
 
                       // Features list
@@ -322,29 +321,37 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
                         // Annual — best value (highlighted)
                         _buildPriceOption(
                           productId: SubscriptionService.annualSubscriptionId,
-                          title: 'Annual',
+                          title: 'Annual Plan',
                           price: _getProductPrice(SubscriptionService.annualSubscriptionId),
-                          period: 'Per year  •  Save 17%',
+                          period: 'Billed annually • Cancel anytime',
                           isBestValue: true,
-                          savings: 'Best Value',
+                          savings: 'Save 17%',
                         ),
                         const SizedBox(height: 12),
                         // Monthly
                         _buildPriceOption(
                           productId: SubscriptionService.monthlySubscriptionId,
-                          title: 'Monthly',
+                          title: 'Monthly Plan',
                           price: _getProductPrice(SubscriptionService.monthlySubscriptionId),
-                          period: 'Per month  •  Cancel anytime',
+                          period: 'Billed monthly • Cancel anytime',
                           isBestValue: false,
                           savings: null,
                         ),
                       ] else
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 16),
-                          child: Text(
-                            'Loading pricing...',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(color: Colors.grey[600]),
+                          child: Column(
+                            children: [
+                              const CircularProgressIndicator(
+                                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6B35)),
+                              ),
+                              const SizedBox(height: 12),
+                              Text(
+                                'Loading pricing...',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.grey[600]),
+                              ),
+                            ],
                           ),
                         ),
 
@@ -443,6 +450,7 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
   }) {
     final isSelected = _selectedProductId == productId;
     final isThisPurchasing = _isPurchasing && isSelected;
+    final isAnnual = productId == SubscriptionService.annualSubscriptionId;
 
     return GestureDetector(
       onTap: isThisPurchasing ? null : () => _purchaseProduct(productId),
@@ -470,74 +478,133 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
               ),
           ],
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: isBestValue ? Colors.white : const Color(0xFF111827),
+            // Header row with title and badge
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      title,
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: isBestValue ? Colors.white : const Color(0xFF111827),
+                      ),
+                    ),
+                    if (savings != null) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          savings,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFFF6B35),
+                          ),
                         ),
                       ),
-                      if (savings != null) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            savings,
-                            style: const TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFFFF6B35),
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
+                  ],
+                ),
+                if (isThisPurchasing)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    period,
+              ],
+            ),
+            const SizedBox(height: 12),
+            
+            // Price and period
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(
+                  price,
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: isBestValue ? Colors.white : const Color(0xFF111827),
+                    height: 1.0,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: Text(
+                    isAnnual ? '/year' : '/month',
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 16,
                       color: isBestValue ? Colors.white70 : Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            
+            // 7-day free trial badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              decoration: BoxDecoration(
+                color: isBestValue 
+                    ? Colors.white.withValues(alpha: 0.2)
+                    : const Color(0xFFFF6B35).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isBestValue 
+                      ? Colors.white.withValues(alpha: 0.3)
+                      : const Color(0xFFFF6B35).withValues(alpha: 0.3),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    LucideIcons.gift,
+                    size: 14,
+                    color: isBestValue ? Colors.white : const Color(0xFFFF6B35),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    '7-day free trial',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: isBestValue ? Colors.white : const Color(0xFFFF6B35),
                     ),
                   ),
                 ],
               ),
             ),
-            if (isThisPurchasing)
-              const SizedBox(
-                width: 24,
-                height: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-              )
-            else
-              Text(
-                price,
-                style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: isBestValue ? Colors.white : const Color(0xFF111827),
-                ),
+            const SizedBox(height: 10),
+            
+            // Additional info
+            Text(
+              period,
+              style: TextStyle(
+                fontSize: 13,
+                color: isBestValue ? Colors.white.withValues(alpha: 0.9) : Colors.grey[600],
+                fontWeight: FontWeight.w500,
               ),
+            ),
           ],
         ),
       ),
@@ -547,9 +614,18 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
   String _getProductPrice(String productId) {
     try {
       final product = _subscription.products.firstWhere((p) => p.id == productId);
+      
+      // If Google Play returns "Free" (happens in testing/unpublished products),
+      // show the actual prices as fallback
+      if (product.price.toLowerCase().contains('free') || 
+          product.price.isEmpty || 
+          product.price == '0') {
+        return productId == SubscriptionService.annualSubscriptionId ? r'$19.99' : r'$1.99';
+      }
+      
       return product.price;
     } catch (e) {
-      // Fallback prices shown while products are loading
+      // Fallback prices shown while products are loading or not found
       return productId == SubscriptionService.annualSubscriptionId ? r'$19.99' : r'$1.99';
     }
   }

@@ -126,24 +126,20 @@ class GentleUpgradeDialog extends StatelessWidget {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     Icon(
-                      LucideIcons.tag,
+                      LucideIcons.gift,
                       color: const Color(0xFFFF6B35),
                       size: featureSize + 6,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      'One-time payment: ',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: subtitleSize,
-                      ),
-                    ),
-                    Text(
-                      '\$2.99',
-                      style: TextStyle(
-                        color: const Color(0xFFFF6B35),
-                        fontSize: priceSize,
-                        fontWeight: FontWeight.bold,
+                    Expanded(
+                      child: Text(
+                        '7-day free trial • Starting at \$1.99/mo',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: subtitleSize,
+                          height: 1.3,
+                        ),
                       ),
                     ),
                   ],
