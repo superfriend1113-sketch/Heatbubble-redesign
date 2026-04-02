@@ -1,0 +1,22 @@
+What's New in v1.0.3:
+
+🚀 PERFORMANCE
+• 5x faster app launch (1-2 seconds vs 8-10 seconds)
+• Fixed crashes and improved stability
+
+💰 MONETIZATION
+• Better ad experience with per-screen frequency
+• Premium users: completely ad-free
+
+🔐 IMPROVEMENTS
+• Smoother signup flow
+• Restore purchases feature
+• Better pricing display with 7-day free trial
+• Fixed home widget integration
+
+🐛 BUG FIXES
+• Resolved Firebase initialization issues
+• Fixed subscription display
+• Improved ad loading reliability
+
+Premium: ₹220/mo or ₹2,250/yr (7-day free trial)
