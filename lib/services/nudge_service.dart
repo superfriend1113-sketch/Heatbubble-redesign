@@ -105,6 +105,32 @@ class NudgeService {
     await AlertStore.save(AlertRecord(type: AlertType.extremeHeat, message: message, timestamp: DateTime.now()));
   }
 
+  Future<void> testTrendNotification() async {
+    // Test with a 3.5°C difference to trigger a trend notification
+    final message = _buildMessage(3.5);
+    await _sendStandardNotification(message);
+    await AlertStore.save(AlertRecord(
+      type: AlertType.risingTrend,
+      message: message,
+      timestamp: DateTime.now(),
+    ));
+  }
+
+  Future<void> testComparisonNotification() async {
+    // Test comparison notification with current unit
+    final us = UnitService.instance;
+    final testDiff = 2.5;
+    final abs = us.format(testDiff);
+    final message = '🌡️ Up $abs from 3 hours ago — your body is warming up.';
+    
+    await _sendStandardNotification(message);
+    await AlertStore.save(AlertRecord(
+      type: AlertType.risingTrend,
+      message: message,
+      timestamp: DateTime.now(),
+    ));
+  }
+
   Future<void> _sendExtremeNotification({
     required int id,
     required String title,
@@ -157,7 +183,7 @@ class NudgeService {
 
   String _buildMessage(double diff) {
     final us = UnitService.instance;
-    final absDiff = us.formatValue(diff.abs());
+    final absDiff = us.format(diff.abs());
     
     if (diff > 0) {
       if (diff >= 6) return "🔥 You're $absDiff hotter than usual — drink water now.";

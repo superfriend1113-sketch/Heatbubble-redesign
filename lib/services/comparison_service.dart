@@ -151,7 +151,7 @@ class ComparisonService {
 
   String _hoursAgoMessage(double diff, int hours) {
     final us = UnitService.instance;
-    final abs = us.formatValue(diff.abs());
+    final abs = us.format(diff.abs());
     final timeLabel = hours == 1 ? '1 hour' : '$hours hours';
 
     if (diff > 0) {
@@ -185,7 +185,7 @@ class ComparisonService {
 
   String _yesterdayMessage(double diff) {
     final us = UnitService.instance;
-    final abs = us.formatValue(diff.abs());
+    final abs = us.format(diff.abs());
     
     if (diff.abs() < 0.3) {
       return '📊 Almost identical to this time yesterday — your pattern is consistent!';
@@ -205,7 +205,7 @@ class ComparisonService {
 
   String _dailyAvgMessage(double diff) {
     final us = UnitService.instance;
-    final abs = us.formatValue(diff.abs());
+    final abs = us.format(diff.abs());
     
     if (diff > 0) {
       if (diff >= 2) {
@@ -222,7 +222,7 @@ class ComparisonService {
 
   String _weekAvgMessage(double diff) {
     final us = UnitService.instance;
-    final abs = us.formatValue(diff.abs());
+    final abs = us.format(diff.abs());
     
     if (diff.abs() < 0.3) {
       return '📊 Right on track — matching your weekly average perfectly.';
