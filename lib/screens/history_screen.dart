@@ -143,40 +143,63 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _buildChart() {
-    final Map<String, List<double>> byDate = {};
-    for (final r in _weekReadings) {
-      final key = DateFormat('yyyy-MM-dd').format(r.timestamp);
-      byDate.putIfAbsent(key, () => []);
-      byDate[key]!.add(r.temperature);
+    // Get readings from last 12 hours only
+    final now = DateTime.now();
+    final twelveHoursAgo = now.subtract(const Duration(hours: 12));
+    final recentReadings = _weekReadings
+        .where((r) => r.timestamp.isAfter(twelveHoursAgo))
+        .toList()
+      ..sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+    if (recentReadings.length < 2) {
+      return const Center(
+        child: Text(
+          'Not enough data yet',
+          style: TextStyle(color: Color(0xFF6B7280), fontSize: 13),
+        ),
+      );
     }
-    final sortedKeys = byDate.keys.toList()..sort();
-    final recentKeys = sortedKeys.length > 7
-        ? sortedKeys.sublist(sortedKeys.length - 7)
-        : sortedKeys;
 
-    if (recentKeys.isEmpty) return const SizedBox.shrink();
+    // Group readings by hour
+    final Map<int, List<double>> byHour = {};
+    for (final r in recentReadings) {
+      final hourKey = r.timestamp.hour;
+      byHour.putIfAbsent(hourKey, () => []);
+      byHour[hourKey]!.add(r.temperature);
+    }
 
+    // Create spots with hourly averages
     final spots = <FlSpot>[];
-    final usedLabels = <String>[];
-    for (int i = 0; i < recentKeys.length; i++) {
-      final temps = byDate[recentKeys[i]]!;
+    final labels = <String>[];
+    final sortedHours = byHour.keys.toList()..sort();
+    
+    for (int i = 0; i < sortedHours.length; i++) {
+      final hour = sortedHours[i];
+      final temps = byHour[hour]!;
       final avg = temps.reduce((a, b) => a + b) / temps.length;
       spots.add(FlSpot(i.toDouble(), avg));
-      usedLabels.add(DateFormat('h:mm a').format(DateTime.parse(recentKeys[i])));
+      
+      // Format hour label (e.g., "10 AM", "2 PM")
+      final hourLabel = hour == 0 ? '12 AM' 
+          : hour < 12 ? '$hour AM'
+          : hour == 12 ? '12 PM'
+          : '${hour - 12} PM';
+      labels.add(hourLabel);
     }
 
+    // Calculate Y-axis range
     final yValues = spots.map((s) => s.y).toList();
     final dataMin = yValues.reduce((a, b) => a < b ? a : b);
     final dataMax = yValues.reduce((a, b) => a > b ? a : b);
-    final minY = ((dataMin - 0.5) / 0.25).floorToDouble() * 0.25;
-    final maxY = ((dataMax + 0.5) / 0.25).ceilToDouble() * 0.25;
+    final minY = ((dataMin - 0.5) / 0.5).floorToDouble() * 0.5;
+    final maxY = ((dataMax + 0.5) / 0.5).ceilToDouble() * 0.5;
 
     return LineChart(
       LineChartData(
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
-          horizontalInterval: 0.25,
+          horizontalInterval: 0.5,
           getDrawingHorizontalLine: (_) => FlLine(
             color: const Color(0xFF111827).withAlpha(20),
             strokeWidth: 0.8,
@@ -189,13 +212,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 36,
-              interval: 0.25,
+              interval: 0.5,
               getTitlesWidget: (value, meta) {
                 if (value == meta.min || value == meta.max) {
                   return const SizedBox.shrink();
                 }
                 return Text(
-                  value.toStringAsFixed(value == value.roundToDouble() ? 0 : 2),
+                  value.toStringAsFixed(1),
                   style: TextStyle(
                     color: const Color(0xFF111827).withAlpha(120),
                     fontSize: 10,
@@ -211,11 +234,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
               interval: 1,
               getTitlesWidget: (value, meta) {
                 final i = value.toInt();
-                if (i < 0 || i >= usedLabels.length) return const SizedBox.shrink();
+                if (i < 0 || i >= labels.length) return const SizedBox.shrink();
+                // Show every other label to avoid crowding
+                if (labels.length > 6 && i % 2 != 0) return const SizedBox.shrink();
                 return Padding(
                   padding: const EdgeInsets.only(top: 8),
                   child: Text(
-                    usedLabels[i],
+                    labels[i],
                     style: TextStyle(
                       color: const Color(0xFF111827).withAlpha(100),
                       fontSize: 9,

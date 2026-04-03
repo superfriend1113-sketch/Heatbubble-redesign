@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'alert_store.dart';
 import 'comparison_service.dart';
+import 'unit_service.dart';
 
 // ── Temperature thresholds (always in °C) ──────────────
 //   0 °F  = −17.78 °C  →  extreme cold
@@ -155,13 +156,15 @@ class NudgeService {
   }
 
   String _buildMessage(double diff) {
-    final absDiff = diff.abs().toStringAsFixed(1);
+    final us = UnitService.instance;
+    final absDiff = us.formatValue(diff.abs());
+    
     if (diff > 0) {
-      if (diff >= 6) return "🔥 You're $absDiff°C hotter than usual — drink water now.";
-      return "🌡️ You're $absDiff°C warmer than usual — stay hydrated!";
+      if (diff >= 6) return "🔥 You're $absDiff hotter than usual — drink water now.";
+      return "🌡️ You're $absDiff warmer than usual — stay hydrated!";
     } else {
-      if (diff <= -6) return "🧊 You're $absDiff°C colder than usual — are you outside?";
-      return "❄️ You're $absDiff°C cooler than usual — somewhere chilly?";
+      if (diff <= -6) return "🧊 You're $absDiff colder than usual — are you outside?";
+      return "❄️ You're $absDiff cooler than usual — somewhere chilly?";
     }
   }
 

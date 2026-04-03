@@ -139,25 +139,38 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       final avg = await _storage.getSevenDayAverage();
       final readings = await _storage.getLast7Days();
 
-      // Calculate variance & trend
+      // Calculate variance & trend using recent readings only
       double variance = 0;
       String trend = 'Stable';
       if (readings.length >= 2) {
-        final temps = readings.take(10).map((r) => r.temperature).toList();
-        final mean = temps.reduce((a, b) => a + b) / temps.length;
-        final sq = temps.map((t) => (t - mean) * (t - mean)).reduce((a, b) => a + b);
-        variance = sq / temps.length;
+        // Use last 20 readings for variance (more recent data)
+        final recentTemps = readings.take(20).map((r) => r.temperature).toList();
+        
+        if (recentTemps.length >= 2) {
+          final mean = recentTemps.reduce((a, b) => a + b) / recentTemps.length;
+          final squaredDiffs = recentTemps.map((t) => (t - mean) * (t - mean));
+          final sumSquaredDiffs = squaredDiffs.reduce((a, b) => a + b);
+          variance = sumSquaredDiffs / recentTemps.length;
+          
+          // Calculate standard deviation for better display
+          variance = variance > 0 ? variance : 0.0;
+        }
 
-        // Trend
-        final recent = temps.take(3).toList();
-        final older = temps.skip(3).take(3).toList();
-        if (recent.isNotEmpty && older.isNotEmpty) {
-          final recAvg = recent.reduce((a, b) => a + b) / recent.length;
-          final oldAvg = older.reduce((a, b) => a + b) / older.length;
-          if (recAvg - oldAvg > 0.2) {
-            trend = 'Rising';
-          } else if (recAvg - oldAvg < -0.2) {
-            trend = 'Falling';
+        // Trend calculation using last 6 readings
+        if (readings.length >= 6) {
+          final recent = readings.take(3).map((r) => r.temperature).toList();
+          final older = readings.skip(3).take(3).map((r) => r.temperature).toList();
+          
+          if (recent.isNotEmpty && older.isNotEmpty) {
+            final recAvg = recent.reduce((a, b) => a + b) / recent.length;
+            final oldAvg = older.reduce((a, b) => a + b) / older.length;
+            final diff = recAvg - oldAvg;
+            
+            if (diff > 0.2) {
+              trend = 'Rising';
+            } else if (diff < -0.2) {
+              trend = 'Falling';
+            }
           }
         }
       }
