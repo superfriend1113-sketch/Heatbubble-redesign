@@ -71,7 +71,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         setState(() => _cloudStats = stats);
       }
     } catch (e) {
-      debugPrint('Error loading cloud data: $e');
     }
   }
 
@@ -819,125 +818,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
             const SizedBox(height: 20),
 
-            // ── Ad Debug (for testing) ──
-            if (!_subscription.isPremium)
-              _glassCard(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(LucideIcons.bug, size: 18, color: Color(0xFFFF6B35)),
-                        const SizedBox(width: 8),
-                        const Text(
-                          'Ad Debug',
-                          style: TextStyle(
-                            color: Color(0xFF111827),
-                            fontSize: 18,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Debug tools for testing ad functionality',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    
-                    // Ad Status
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[200],
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Ad Status',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.grey[700],
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Builder(
-                            builder: (context) {
-                              final status = _ads.getAdStatus();
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _debugRow('Banner Loaded', status['bannerLoaded'] ? '✅' : '❌'),
-                                  _debugRow('Interstitial Loaded', status['interstitialLoaded'] ? '✅' : '❌'),
-                                  _debugRow('App Open Loaded', status['appOpenLoaded'] ? '✅' : '❌'),
-                                  if (status['lastError'] != null)
-                                    Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Text(
-                                        'Error: ${status['lastError']}',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: Colors.red[700],
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 12),
-                    
-                    // Action Buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () {
-                              _ads.forceReloadAllAds();
-                              setState(() {});
-                              _showMessage('Reloading all ads...', isError: false);
-                            },
-                            icon: const Icon(LucideIcons.refreshCw, size: 16),
-                            label: const Text('Reload Ads'),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Color(0xFFFF6B35)),
-                              foregroundColor: const Color(0xFFFF6B35),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () async {
-                              await _ads.showAppOpenAd();
-                              _showMessage('Attempted to show app open ad', isError: false);
-                            },
-                            icon: const Icon(LucideIcons.play, size: 16),
-                            label: const Text('Test App Open'),
-                            style: OutlinedButton.styleFrom(
-                              side: const BorderSide(color: Color(0xFF111827)),
-                              foregroundColor: const Color(0xFF111827),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            if (!_subscription.isPremium) const SizedBox(height: 20),
-
             // ── App Information ──
             _glassCard(
               child: Column(
@@ -1118,34 +998,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ),
       ],
-    );
-  }
-
-  // ── Debug row (for ad status) ──
-  Widget _debugRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 4),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              color: Colors.grey[700],
-              fontSize: 12,
-              fontWeight: FontWeight.w400,
-            ),
-          ),
-          Text(
-            value,
-            style: TextStyle(
-              color: Colors.grey[900],
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
     );
   }
 

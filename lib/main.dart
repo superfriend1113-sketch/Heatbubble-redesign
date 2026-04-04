@@ -52,7 +52,6 @@ void main() async {
 /// Initialize all non-critical services in the background after app launch
 void _initializeInBackground() {
   Future.microtask(() async {
-    debugPrint('🚀 [Init] Starting background initialization...');
     
     try {
       // Run all independent async operations concurrently
@@ -71,14 +70,12 @@ void _initializeInBackground() {
         HomeWidgetService.init(),
       ]);
       
-      debugPrint('✅ [Init] Core services initialized');
       
       // Initialize Firebase (optional - won't block if not configured)
       try {
         await FirebaseInitService().initialize().timeout(
           const Duration(seconds: 5),
           onTimeout: () {
-            debugPrint('⚠️  [Init] Firebase initialization timed out after 5s');
             throw TimeoutException('Firebase init timeout');
           },
         );
@@ -87,52 +84,33 @@ void _initializeInBackground() {
         await _syncSubscriptionFromFirebase().timeout(
           const Duration(seconds: 3),
           onTimeout: () {
-            debugPrint('⚠️  [Init] Firebase sync timed out after 3s');
           },
         );
       } catch (e) {
-        debugPrint('⚠️  [Init] Firebase not configured yet: $e');
-        debugPrint('   App will work without Firebase features');
       }
 
       // Schedule daily reminder
       await NudgeService().scheduleDailyReminder();
-      debugPrint('✅ [Init] All background initialization complete');
       
       // Show app open ad AFTER everything is initialized (once per session, for free users)
       await _showAppOpenAdIfNeeded();
       
     } catch (e, stackTrace) {
-      debugPrint('❌ [Init] Background initialization error: $e');
-      debugPrint('   Stack trace: $stackTrace');
     }
   });
 }
 
 /// Initialize Mobile Ads SDK with test device configuration
 Future<void> _initializeMobileAds() async {
-  debugPrint('═══════════════════════════════════════════════════════');
-  debugPrint('[Init] Initializing Mobile Ads SDK...');
-  debugPrint('[Init] Platform: ${defaultTargetPlatform.name}');
-  debugPrint('═══════════════════════════════════════════════════════');
   
   try {
     // Initialize the Mobile Ads SDK
     final initResult = await MobileAds.instance.initialize();
     
-    debugPrint('[Init] ✅ Mobile Ads SDK initialized successfully');
-    debugPrint('[Init] Adapter statuses:');
     initResult.adapterStatuses.forEach((key, value) {
-      debugPrint('       - $key: ${value.state.name} (${value.description})');
     });
-    debugPrint('═══════════════════════════════════════════════════════');
     
   } catch (e, stackTrace) {
-    debugPrint('═══════════════════════════════════════════════════════');
-    debugPrint('[Init] ❌ ERROR initializing Mobile Ads');
-    debugPrint('[Init] Exception: $e');
-    debugPrint('[Init] Stack trace: $stackTrace');
-    debugPrint('═══════════════════════════════════════════════════════');
   }
 }
 
@@ -142,27 +120,16 @@ Future<void> _showAppOpenAdIfNeeded() async {
     final subscription = SubscriptionService();
     final ads = AdsService();
     
-    debugPrint('═══════════════════════════════════════════════════════');
-    debugPrint('🚀 [Init] Checking if app open ad should show...');
-    debugPrint('   - isPremium: ${subscription.isPremium}');
     
     // Only show for free users
     if (!subscription.isPremium) {
       // Wait 2 seconds for app to settle and UI to be ready
-      debugPrint('   - Waiting 2 seconds for app to settle...');
       await Future.delayed(const Duration(seconds: 2));
       
-      debugPrint('   - Attempting to show app open ad...');
       await ads.showAppOpenAd();
-      debugPrint('   - App open ad flow completed');
     } else {
-      debugPrint('   - User is premium, skipping app open ad');
     }
-    debugPrint('═══════════════════════════════════════════════════════');
   } catch (e) {
-    debugPrint('═══════════════════════════════════════════════════════');
-    debugPrint('⚠️  [Init] Failed to show app open ad: $e');
-    debugPrint('═══════════════════════════════════════════════════════');
   }
 }
 
@@ -179,13 +146,10 @@ Future<void> _syncSubscriptionFromFirebase() async {
     final subscription = SubscriptionService();
     
     if (auth.isSignedIn) {
-      debugPrint('🔄 [Init] User is logged in, syncing subscription from Firebase');
       await subscription.syncFromFirebase();
     } else {
-      debugPrint('ℹ️  [Init] User not logged in, using local subscription status');
     }
   } catch (e) {
-    debugPrint('⚠️  [Init] Failed to sync subscription: $e');
     // Continue even if sync fails - use local data
   }
 }

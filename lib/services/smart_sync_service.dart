@@ -30,12 +30,10 @@ class SmartSyncService {
   /// - Even cheaper and more private!
   Future<void> smartSync() async {
     if (!_auth.isSignedIn) {
-      debugPrint('⚠️  [SmartSync] Not signed in, skipping sync');
       return;
     }
 
     try {
-      debugPrint('🔄 [SmartSync] Starting smart sync...');
       
       // Only sync aggregated data (no individual readings)
       await _syncAggregates();
@@ -44,9 +42,7 @@ class SmartSyncService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_lastSyncKey, DateTime.now().toIso8601String());
       
-      debugPrint('✅ [SmartSync] Smart sync completed');
     } catch (e) {
-      debugPrint('❌ [SmartSync] Smart sync failed: $e');
       rethrow;
     }
   }
@@ -68,7 +64,6 @@ class SmartSyncService {
         startDate = DateTime.now().subtract(const Duration(days: 365));
       }
       
-      debugPrint('   - Aggregating data since $startDate');
       
       // Get all readings since last aggregate sync
       final allReadings = await _storage.getAllReadings();
@@ -77,7 +72,6 @@ class SmartSyncService {
           .toList();
       
       if (readingsToAggregate.isEmpty) {
-        debugPrint('   - No new data to aggregate');
         return;
       }
       
@@ -93,9 +87,7 @@ class SmartSyncService {
       // Update last aggregate sync time
       await prefs.setString(_lastAggregateKey, DateTime.now().toIso8601String());
       
-      debugPrint('   ✅ Aggregates synced');
     } catch (e) {
-      debugPrint('   ❌ Failed to sync aggregates: $e');
       rethrow;
     }
   }
@@ -175,7 +167,6 @@ class SmartSyncService {
   ) async {
     final usersCollection = _firestore.users;
     if (usersCollection == null) {
-      debugPrint('   ⚠️  Firebase not initialized, skipping aggregate upload');
       return;
     }
     
@@ -198,9 +189,7 @@ class SmartSyncService {
             .set(entry.value);
       }
       
-      debugPrint('   - Uploaded ${hourlyAggregates.length} hourly + ${dailyAggregates.length} daily aggregates');
     } catch (e) {
-      debugPrint('   ❌ Failed to upload aggregates: $e');
       rethrow;
     }
   }
@@ -233,7 +222,6 @@ class SmartSyncService {
     
     final usersCollection = _firestore.users;
     if (usersCollection == null) {
-      debugPrint('⚠️  [SmartSync] Firebase not initialized');
       return [];
     }
     
@@ -250,7 +238,6 @@ class SmartSyncService {
       
       return snapshot.docs.map((doc) => doc.data()).toList();
     } catch (e) {
-      debugPrint('❌ [SmartSync] Failed to get hourly chart data: $e');
       return [];
     }
   }
@@ -264,7 +251,6 @@ class SmartSyncService {
     
     final usersCollection = _firestore.users;
     if (usersCollection == null) {
-      debugPrint('⚠️  [SmartSync] Firebase not initialized');
       return [];
     }
     
@@ -281,7 +267,6 @@ class SmartSyncService {
       
       return snapshot.docs.map((doc) => doc.data()).toList();
     } catch (e) {
-      debugPrint('❌ [SmartSync] Failed to get daily chart data: $e');
       return [];
     }
   }

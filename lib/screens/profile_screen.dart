@@ -45,7 +45,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         });
       }
     } catch (e) {
-      debugPrint('Error loading user data: $e');
     }
   }
 

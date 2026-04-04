@@ -23,18 +23,14 @@ class FirebaseSyncService {
   /// Sync all local data to Firebase
   Future<void> syncToCloud() async {
     if (!_auth.isSignedIn) {
-      debugPrint('⚠️  [Sync] User not signed in, skipping sync');
       return;
     }
 
     if (_isSyncing) {
-      debugPrint('⚠️  [Sync] Already syncing, skipping');
       return;
     }
 
     _isSyncing = true;
-    debugPrint('═══════════════════════════════════════════════════════');
-    debugPrint('🔄 [Sync] Starting cloud sync...');
 
     try {
       final userId = _auth.currentUser!.uid;
@@ -49,12 +45,7 @@ class FirebaseSyncService {
       await _syncUserPreferences(userId);
 
       _lastSyncTime = DateTime.now();
-      debugPrint('✅ [Sync] Cloud sync completed successfully');
-      debugPrint('═══════════════════════════════════════════════════════');
     } catch (e, stackTrace) {
-      debugPrint('❌ [Sync] Cloud sync failed: $e');
-      debugPrint('   Stack trace: $stackTrace');
-      debugPrint('═══════════════════════════════════════════════════════');
       rethrow;
     } finally {
       _isSyncing = false;
@@ -64,13 +55,11 @@ class FirebaseSyncService {
   /// Sync temperature readings to Firestore
   Future<void> _syncReadings(String userId) async {
     try {
-      debugPrint('📊 [Sync] Syncing temperature readings...');
 
       // Get all local readings
       final localReadings = await _storage.getLast7Days();
 
       if (localReadings.isEmpty) {
-        debugPrint('   No readings to sync');
         return;
       }
 
@@ -80,9 +69,7 @@ class FirebaseSyncService {
         readingsList: localReadings,
       );
 
-      debugPrint('✅ [Sync] Synced ${localReadings.length} readings');
     } catch (e) {
-      debugPrint('❌ [Sync] Failed to sync readings: $e');
       rethrow;
     }
   }
@@ -90,16 +77,13 @@ class FirebaseSyncService {
   /// Sync subscription status to Firestore
   Future<void> _syncSubscription(String userId) async {
     try {
-      debugPrint('💳 [Sync] Syncing subscription status...');
 
       await _firestore.saveSubscription(
         userId: userId,
         isPremium: _subscription.isPremium,
       );
 
-      debugPrint('✅ [Sync] Subscription synced');
     } catch (e) {
-      debugPrint('❌ [Sync] Failed to sync subscription: $e');
       rethrow;
     }
   }
@@ -107,7 +91,6 @@ class FirebaseSyncService {
   /// Sync user preferences to Firestore
   Future<void> _syncUserPreferences(String userId) async {
     try {
-      debugPrint('⚙️  [Sync] Syncing user preferences...');
 
       // Get user preferences (unit, notifications, etc.)
       // TODO: Implement preference storage
@@ -120,9 +103,7 @@ class FirebaseSyncService {
         },
       );
 
-      debugPrint('✅ [Sync] Preferences synced');
     } catch (e) {
-      debugPrint('❌ [Sync] Failed to sync preferences: $e');
       rethrow;
     }
   }
@@ -130,12 +111,9 @@ class FirebaseSyncService {
   /// Restore data from Firebase to local storage
   Future<void> restoreFromCloud() async {
     if (!_auth.isSignedIn) {
-      debugPrint('⚠️  [Sync] User not signed in, skipping restore');
       return;
     }
 
-    debugPrint('═══════════════════════════════════════════════════════');
-    debugPrint('📥 [Sync] Restoring data from cloud...');
 
     try {
       final userId = _auth.currentUser!.uid;
@@ -146,22 +124,13 @@ class FirebaseSyncService {
       // 2. Restore user preferences
       final profile = await _firestore.getUserProfile(userId);
       if (profile != null) {
-        debugPrint('✅ [Sync] User profile restored');
         // TODO: Apply preferences to local storage
       }
 
       // 3. Get cloud statistics
       final stats = await _firestore.getUserStats(userId);
-      debugPrint('📊 [Sync] Cloud stats:');
-      debugPrint('   Total readings: ${stats['totalReadings']}');
-      debugPrint('   Avg temp: ${stats['avgTemp']}');
 
-      debugPrint('✅ [Sync] Data restored from cloud');
-      debugPrint('═══════════════════════════════════════════════════════');
     } catch (e, stackTrace) {
-      debugPrint('❌ [Sync] Restore failed: $e');
-      debugPrint('   Stack trace: $stackTrace');
-      debugPrint('═══════════════════════════════════════════════════════');
       rethrow;
     }
   }
@@ -176,7 +145,6 @@ class FirebaseSyncService {
     if (_lastSyncTime != null) {
       final hoursSinceLastSync = DateTime.now().difference(_lastSyncTime!).inHours;
       if (hoursSinceLastSync < 1) {
-        debugPrint('⚠️  [Sync] Last sync was ${hoursSinceLastSync}h ago, skipping');
         return;
       }
     }
@@ -184,7 +152,6 @@ class FirebaseSyncService {
     try {
       await syncToCloud();
     } catch (e) {
-      debugPrint('⚠️  [Sync] Auto-sync failed (non-critical): $e');
       // Don't throw - auto-sync failures shouldn't block app
     }
   }
@@ -192,11 +159,9 @@ class FirebaseSyncService {
   /// Clear all cloud data (for account deletion)
   Future<void> clearCloudData() async {
     if (!_auth.isSignedIn) {
-      debugPrint('⚠️  [Sync] User not signed in, nothing to clear');
       return;
     }
 
-    debugPrint('🗑️  [Sync] Clearing all cloud data...');
 
     try {
       final userId = _auth.currentUser!.uid;
@@ -207,9 +172,7 @@ class FirebaseSyncService {
       // Delete Storage files
       // await _storageService.deleteUserFiles(userId);
 
-      debugPrint('✅ [Sync] Cloud data cleared');
     } catch (e) {
-      debugPrint('❌ [Sync] Failed to clear cloud data: $e');
       rethrow;
     }
   }

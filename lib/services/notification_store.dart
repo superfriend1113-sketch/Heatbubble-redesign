@@ -30,7 +30,6 @@ class NotificationStore {
       final jsonList = trimmed.map((n) => json.encode(n.toJson())).toList();
       await _prefs.setStringList(_notificationsKey, jsonList);
     } catch (e) {
-      debugPrint('❌ [NotificationStore] Failed to save notification: $e');
     }
   }
 
@@ -46,14 +45,12 @@ class NotificationStore {
               final json = jsonDecode(jsonStr) as Map<String, dynamic>;
               return NotificationModel.fromJson(json);
             } catch (e) {
-              debugPrint('⚠️  [NotificationStore] Failed to parse notification: $e');
               return null;
             }
           })
           .whereType<NotificationModel>()
           .toList();
     } catch (e) {
-      debugPrint('❌ [NotificationStore] Failed to get notifications: $e');
       return [];
     }
   }
@@ -64,7 +61,6 @@ class NotificationStore {
       final notifications = await getNotifications(limit: 200);
       return notifications.where((n) => !n.isRead).toList();
     } catch (e) {
-      debugPrint('❌ [NotificationStore] Failed to get unread notifications: $e');
       return [];
     }
   }
@@ -84,7 +80,6 @@ class NotificationStore {
         await _prefs.setStringList(_notificationsKey, jsonList);
       }
     } catch (e) {
-      debugPrint('❌ [NotificationStore] Failed to mark as read: $e');
     }
   }
 
@@ -94,7 +89,6 @@ class NotificationStore {
       final notifications = await getUnreadNotifications();
       return notifications.length;
     } catch (e) {
-      debugPrint('❌ [NotificationStore] Failed to get unread count: $e');
       return 0;
     }
   }
@@ -104,7 +98,6 @@ class NotificationStore {
     try {
       await _prefs.remove(_notificationsKey);
     } catch (e) {
-      debugPrint('❌ [NotificationStore] Failed to clear notifications: $e');
     }
   }
 
@@ -117,7 +110,6 @@ class NotificationStore {
       final jsonList = notifications.map((n) => json.encode(n.toJson())).toList();
       await _prefs.setStringList(_notificationsKey, jsonList);
     } catch (e) {
-      debugPrint('❌ [NotificationStore] Failed to delete notification: $e');
     }
   }
 }

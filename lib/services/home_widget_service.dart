@@ -54,9 +54,7 @@ class HomeWidgetService {
         qualifiedAndroidName: 'com.heatbubble.app.$_androidWidgetName',
       );
 
-      debugPrint('📱 [HomeWidget] $formatted | $trend | $status | premium=$isPremium');
     } catch (e) {
-      debugPrint('⚠️  [HomeWidget] updateWidget failed: $e');
     }
   }
 
@@ -105,9 +103,7 @@ class HomeWidgetService {
   static Future<void> init() async {
     try {
       await HomeWidget.setAppGroupId(_appGroupId);
-      debugPrint('📱 [HomeWidget] Initialized');
     } catch (e) {
-      debugPrint('⚠️  [HomeWidget] init failed: $e');
     }
   }
 

@@ -15,7 +15,6 @@ class FirebaseStorageService {
     required File imageFile,
   }) async {
     try {
-      debugPrint('📤 [Storage] Uploading profile picture for user: $userId');
       
       final ref = _storage.ref().child('users/$userId/profile.jpg');
       
@@ -30,16 +29,13 @@ class FirebaseStorageService {
       // Monitor upload progress
       uploadTask.snapshotEvents.listen((snapshot) {
         final progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-        debugPrint('📊 [Storage] Upload progress: ${progress.toStringAsFixed(1)}%');
       });
 
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
 
-      debugPrint('✅ [Storage] Profile picture uploaded: $downloadUrl');
       return downloadUrl;
     } catch (e) {
-      debugPrint('❌ [Storage] Upload profile picture failed: $e');
       rethrow;
     }
   }
@@ -51,7 +47,6 @@ class FirebaseStorageService {
     required String chartId,
   }) async {
     try {
-      debugPrint('📤 [Storage] Uploading chart image: $chartId');
       
       final ref = _storage.ref().child('users/$userId/charts/$chartId.png');
       
@@ -69,10 +64,8 @@ class FirebaseStorageService {
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
 
-      debugPrint('✅ [Storage] Chart image uploaded: $downloadUrl');
       return downloadUrl;
     } catch (e) {
-      debugPrint('❌ [Storage] Upload chart image failed: $e');
       rethrow;
     }
   }
@@ -84,7 +77,6 @@ class FirebaseStorageService {
     required String fileName,
   }) async {
     try {
-      debugPrint('📤 [Storage] Uploading exported data: $fileName');
       
       final ref = _storage.ref().child('users/$userId/exports/$fileName');
       
@@ -92,10 +84,8 @@ class FirebaseStorageService {
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
 
-      debugPrint('✅ [Storage] Exported data uploaded: $downloadUrl');
       return downloadUrl;
     } catch (e) {
-      debugPrint('❌ [Storage] Upload exported data failed: $e');
       rethrow;
     }
   }
@@ -103,14 +93,11 @@ class FirebaseStorageService {
   /// Delete file from storage
   Future<void> deleteFile(String filePath) async {
     try {
-      debugPrint('🗑️ [Storage] Deleting file: $filePath');
       
       final ref = _storage.ref().child(filePath);
       await ref.delete();
 
-      debugPrint('✅ [Storage] File deleted');
     } catch (e) {
-      debugPrint('❌ [Storage] Delete file failed: $e');
       rethrow;
     }
   }
@@ -118,7 +105,6 @@ class FirebaseStorageService {
   /// Delete all user files
   Future<void> deleteUserFiles(String userId) async {
     try {
-      debugPrint('🗑️ [Storage] Deleting all files for user: $userId');
       
       final ref = _storage.ref().child('users/$userId');
       final listResult = await ref.listAll();
@@ -133,9 +119,7 @@ class FirebaseStorageService {
         await _deleteDirectory(prefix);
       }
 
-      debugPrint('✅ [Storage] All user files deleted');
     } catch (e) {
-      debugPrint('❌ [Storage] Delete user files failed: $e');
       rethrow;
     }
   }
@@ -156,15 +140,12 @@ class FirebaseStorageService {
   /// Get download URL for a file
   Future<String> getDownloadUrl(String filePath) async {
     try {
-      debugPrint('🔗 [Storage] Getting download URL: $filePath');
       
       final ref = _storage.ref().child(filePath);
       final url = await ref.getDownloadURL();
 
-      debugPrint('✅ [Storage] Download URL retrieved');
       return url;
     } catch (e) {
-      debugPrint('❌ [Storage] Get download URL failed: $e');
       rethrow;
     }
   }
@@ -172,17 +153,14 @@ class FirebaseStorageService {
   /// List all files in a directory
   Future<List<String>> listFiles(String directoryPath) async {
     try {
-      debugPrint('📂 [Storage] Listing files in: $directoryPath');
       
       final ref = _storage.ref().child(directoryPath);
       final listResult = await ref.listAll();
 
       final fileNames = listResult.items.map((item) => item.name).toList();
 
-      debugPrint('✅ [Storage] Found ${fileNames.length} files');
       return fileNames;
     } catch (e) {
-      debugPrint('❌ [Storage] List files failed: $e');
       rethrow;
     }
   }
@@ -190,15 +168,12 @@ class FirebaseStorageService {
   /// Get file metadata
   Future<FullMetadata> getFileMetadata(String filePath) async {
     try {
-      debugPrint('ℹ️  [Storage] Getting metadata for: $filePath');
       
       final ref = _storage.ref().child(filePath);
       final metadata = await ref.getMetadata();
 
-      debugPrint('✅ [Storage] Metadata retrieved');
       return metadata;
     } catch (e) {
-      debugPrint('❌ [Storage] Get metadata failed: $e');
       rethrow;
     }
   }

@@ -9,7 +9,6 @@ mixin NotificationHandlerMixin {
   void handleNotificationAction(String? action) {
     if (action == null) return;
     
-    debugPrint('🔔 [NotificationHandler] Handling action: $action');
     
     // Route to appropriate screen based on action
     // This should be implemented in the widget using this mixin
@@ -21,7 +20,6 @@ mixin NotificationHandlerMixin {
     
     // Listen for notification taps
     notificationService.onNotificationTapped = (notificationId) {
-      debugPrint('🔔 [NotificationHandler] Notification tapped: $notificationId');
       handleNotificationAction(notificationId);
     };
   }

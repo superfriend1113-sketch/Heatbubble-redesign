@@ -16,7 +16,6 @@ class FirebaseAuthService {
       _auth ??= FirebaseAuth.instance;
       return _auth;
     } catch (e) {
-      debugPrint('⚠️  [Auth] Firebase not initialized yet: $e');
       return null;
     }
   }
@@ -48,12 +47,10 @@ class FirebaseAuthService {
   }) async {
     final auth = _authInstance;
     if (auth == null) {
-      debugPrint('❌ [Auth] Firebase not initialized');
       return null;
     }
     
     try {
-      debugPrint('🔐 [Auth] Signing up user: $email');
       
       final credential = await auth.createUserWithEmailAndPassword(
         email: email,
@@ -66,13 +63,10 @@ class FirebaseAuthService {
         await credential.user!.reload();
       }
 
-      debugPrint('✅ [Auth] Sign up successful: ${credential.user?.uid}');
       return credential;
     } on FirebaseAuthException catch (e) {
-      debugPrint('❌ [Auth] Sign up failed: ${e.code} - ${e.message}');
       rethrow;
     } catch (e) {
-      debugPrint('❌ [Auth] Sign up error (Firebase not initialized?): $e');
       return null;
     }
   }
@@ -84,22 +78,18 @@ class FirebaseAuthService {
   }) async {
     final auth = _authInstance;
     if (auth == null) {
-      debugPrint('❌ [Auth] Firebase not initialized');
       return null;
     }
     
     try {
-      debugPrint('🔐 [Auth] Signing in user: $email');
       
       final credential = await auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      debugPrint('✅ [Auth] Sign in successful: ${credential.user?.uid}');
       return credential;
     } on FirebaseAuthException catch (e) {
-      debugPrint('❌ [Auth] Sign in failed: ${e.code} - ${e.message}');
       rethrow;
     }
   }
@@ -108,22 +98,18 @@ class FirebaseAuthService {
   Future<UserCredential?> signInWithGoogle() async {
     final auth = _authInstance;
     if (auth == null) {
-      debugPrint('❌ [Auth] Firebase not initialized');
       return null;
     }
     
     try {
-      debugPrint('🔐 [Auth] Starting Google Sign-In');
       
       // Trigger the authentication flow
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       
       if (googleUser == null) {
-        debugPrint('⚠️  [Auth] Google Sign-In cancelled by user');
         return null;
       }
 
-      debugPrint('✅ [Auth] Google user selected: ${googleUser.email}');
 
       // Obtain the auth details from the request
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
@@ -137,13 +123,10 @@ class FirebaseAuthService {
       // Sign in to Firebase with the Google credential
       final userCredential = await auth.signInWithCredential(credential);
       
-      debugPrint('✅ [Auth] Google Sign-In successful: ${userCredential.user?.uid}');
       return userCredential;
     } on FirebaseAuthException catch (e) {
-      debugPrint('❌ [Auth] Google Sign-In failed: ${e.code} - ${e.message}');
       rethrow;
     } catch (e) {
-      debugPrint('❌ [Auth] Google Sign-In error: $e');
       rethrow;
     }
   }
@@ -152,19 +135,15 @@ class FirebaseAuthService {
   Future<UserCredential?> signInAnonymously() async {
     final auth = _authInstance;
     if (auth == null) {
-      debugPrint('❌ [Auth] Firebase not initialized');
       return null;
     }
     
     try {
-      debugPrint('🔐 [Auth] Signing in anonymously');
       
       final credential = await auth.signInAnonymously();
 
-      debugPrint('✅ [Auth] Anonymous sign in successful: ${credential.user?.uid}');
       return credential;
     } on FirebaseAuthException catch (e) {
-      debugPrint('❌ [Auth] Anonymous sign in failed: ${e.code} - ${e.message}');
       rethrow;
     }
   }
@@ -173,23 +152,18 @@ class FirebaseAuthService {
   Future<void> signOut() async {
     final auth = _authInstance;
     if (auth == null) {
-      debugPrint('❌ [Auth] Firebase not initialized');
       return;
     }
     
     try {
-      debugPrint('🔐 [Auth] Signing out user');
       
       // Sign out from Google if signed in with Google
       if (await _googleSignIn.isSignedIn()) {
         await _googleSignIn.signOut();
-        debugPrint('✅ [Auth] Google Sign-Out successful');
       }
       
       await auth.signOut();
-      debugPrint('✅ [Auth] Sign out successful');
     } catch (e) {
-      debugPrint('❌ [Auth] Sign out failed: $e');
       rethrow;
     }
   }
@@ -198,16 +172,12 @@ class FirebaseAuthService {
   Future<void> sendPasswordResetEmail(String email) async {
     final auth = _authInstance;
     if (auth == null) {
-      debugPrint('❌ [Auth] Firebase not initialized');
       return;
     }
     
     try {
-      debugPrint('📧 [Auth] Sending password reset email to: $email');
       await auth.sendPasswordResetEmail(email: email);
-      debugPrint('✅ [Auth] Password reset email sent');
     } on FirebaseAuthException catch (e) {
-      debugPrint('❌ [Auth] Password reset failed: ${e.code} - ${e.message}');
       rethrow;
     }
   }
@@ -216,7 +186,6 @@ class FirebaseAuthService {
   Future<void> deleteAccount() async {
     final auth = _authInstance;
     if (auth == null) {
-      debugPrint('❌ [Auth] Firebase not initialized');
       return;
     }
     
@@ -226,11 +195,8 @@ class FirebaseAuthService {
         throw Exception('No user signed in');
       }
 
-      debugPrint('🗑️ [Auth] Deleting user account: ${user.uid}');
       await user.delete();
-      debugPrint('✅ [Auth] Account deleted successfully');
     } on FirebaseAuthException catch (e) {
-      debugPrint('❌ [Auth] Account deletion failed: ${e.code} - ${e.message}');
       rethrow;
     }
   }
@@ -242,7 +208,6 @@ class FirebaseAuthService {
   }) async {
     final auth = _authInstance;
     if (auth == null) {
-      debugPrint('❌ [Auth] Firebase not initialized');
       return;
     }
     
@@ -252,7 +217,6 @@ class FirebaseAuthService {
         throw Exception('No user signed in');
       }
 
-      debugPrint('👤 [Auth] Updating user profile');
       
       if (displayName != null) {
         await user.updateDisplayName(displayName);
@@ -263,9 +227,7 @@ class FirebaseAuthService {
       }
       
       await user.reload();
-      debugPrint('✅ [Auth] Profile updated successfully');
     } catch (e) {
-      debugPrint('❌ [Auth] Profile update failed: $e');
       rethrow;
     }
   }

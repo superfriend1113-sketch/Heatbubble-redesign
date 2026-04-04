@@ -67,7 +67,6 @@ class SubscriptionService {
     if (expiryStr != null) {
       final expiry = DateTime.tryParse(expiryStr);
       if (expiry != null && DateTime.now().isAfter(expiry)) {
-        debugPrint('⚠️  [Subscription] Local cache expired — resetting premium');
         _isPremium = false;
         await prefs.setBool(_premiumKey, false);
       }
@@ -75,16 +74,10 @@ class SubscriptionService {
   }
 
   Future<void> _initializeProducts() async {
-    debugPrint('═══════════════════════════════════════════════════════');
-    debugPrint('🛒 [Subscription] Initializing In-App Products...');
-    debugPrint('   Product IDs to query: $_allProductIds');
     
     final bool available = await iap.isAvailable();
-    debugPrint('   IAP Available: $available');
     
     if (!available) {
-      debugPrint('⚠️  [Subscription] In-App Purchase not available on this device');
-      debugPrint('═══════════════════════════════════════════════════════');
       return;
     }
 
@@ -99,28 +92,16 @@ class SubscriptionService {
                product.price != '0';
       }).toList();
       
-      debugPrint('✅ [Subscription] Query completed');
-      debugPrint('   Products found: ${_products.length} (filtered from ${response.productDetails.length})');
       
       for (var product in _products) {
-        debugPrint('   ├─ ID: ${product.id}');
-        debugPrint('   │  Title: ${product.title}');
-        debugPrint('   │  Price: ${product.price}');
-        debugPrint('   │  Description: ${product.description}');
       }
       
       if (response.notFoundIDs.isNotEmpty) {
-        debugPrint('⚠️  [Subscription] Products NOT FOUND in Play Console:');
         for (var id in response.notFoundIDs) {
-          debugPrint('   ✗ $id');
         }
-        debugPrint('   → Check Play Console: Monetize → Subscriptions');
-        debugPrint('   → Ensure products are published (at least to Internal Testing)');
       }
       
-      debugPrint('═══════════════════════════════════════════════════════');
     } catch (e) {
-      debugPrint('❌ [Subscription] Error loading products: $e');
     }
   }
 
@@ -135,7 +116,6 @@ class SubscriptionService {
   Future<bool> _startSubscription(String productId) async {
     final product = _products.where((p) => p.id == productId).firstOrNull;
     if (product == null) {
-      debugPrint('❌ [Subscription] Product not found: $productId');
       return false;
     }
     try {
@@ -144,7 +124,6 @@ class SubscriptionService {
       await iap.buyNonConsumable(purchaseParam: param);
       return true;
     } catch (e) {
-      debugPrint('❌ [Subscription] Purchase error: $e');
       return false;
     }
   }
@@ -186,9 +165,7 @@ class SubscriptionService {
           productId: productId,
           expiryDate: expiry,
         );
-        debugPrint('✅ [Subscription] Synced to Firebase (premium=$value, expiry=$expiry)');
       } catch (e) {
-        debugPrint('⚠️  [Subscription] Firebase sync failed: $e');
       }
     }
   }
@@ -199,7 +176,6 @@ class SubscriptionService {
     if (!_auth.isSignedIn) return;
 
     try {
-      debugPrint('🔄 [Subscription] Syncing from Firebase');
       final data = await _firestore.getSubscription(_auth.currentUser!.uid);
 
       if (data != null) {
@@ -209,7 +185,6 @@ class SubscriptionService {
         if (data['expiryDate'] != null) {
           final expiryDate = (data['expiryDate'] as dynamic).toDate() as DateTime;
           if (DateTime.now().isAfter(expiryDate)) {
-            debugPrint('⚠️  [Subscription] Server expiry passed — revoking premium');
             await setPremium(false);
             return;
           }
@@ -218,10 +193,8 @@ class SubscriptionService {
         _isPremium = isPremium;
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool(_premiumKey, isPremium);
-        debugPrint('✅ [Subscription] Synced: isPremium=$isPremium');
       }
     } catch (e) {
-      debugPrint('❌ [Subscription] Firebase sync failed: $e');
     }
   }
 
@@ -229,7 +202,6 @@ class SubscriptionService {
 
   /// Restores purchases — use when user reinstalls or switches device.
   Future<bool> restorePurchases() async {
-    debugPrint('🔄 [Subscription] Starting restore purchases...');
     
     try {
       // Restore purchases triggers Google Play to refresh purchase state
@@ -238,11 +210,9 @@ class SubscriptionService {
       // Reload premium status from local storage
       await _loadPremiumStatus();
       
-      debugPrint('✅ [Subscription] Restore complete - isPremium: $_isPremium');
       return _isPremium;
       
     } catch (e) {
-      debugPrint('❌ [Subscription] Restore failed: $e');
       return false;
     }
   }

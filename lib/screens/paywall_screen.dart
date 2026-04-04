@@ -44,7 +44,6 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
       _handlePurchaseUpdates,
       onDone: () => _purchaseSubscription?.cancel(),
       onError: (error) {
-        debugPrint('❌ [Paywall] Purchase stream error: $error');
         _showError('Purchase failed: $error');
       },
     );
@@ -57,7 +56,6 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
 
   void _handlePurchaseUpdates(List<PurchaseDetails> purchases) {
     for (var purchase in purchases) {
-      debugPrint('📦 [Paywall] Purchase update: ${purchase.status}');
       
       if (purchase.status == PurchaseStatus.purchased) {
         _handleSuccessfulPurchase(purchase);
@@ -91,7 +89,6 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
         }
       }
     } catch (e) {
-      debugPrint('❌ [Paywall] Error handling purchase: $e');
       _showError('Failed to activate premium: $e');
     } finally {
       if (mounted) {
@@ -118,7 +115,6 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
       final purchaseParam = PurchaseParam(productDetails: product);
       await _iap.buyNonConsumable(purchaseParam: purchaseParam);
     } catch (e) {
-      debugPrint('❌ [Paywall] Purchase error: $e');
       _showError(e.toString());
       setState(() => _isPurchasing = false);
     }
@@ -147,7 +143,6 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
     } catch (e) {
       if (!mounted) return;
       _showError('Failed to restore purchases. Please try again.');
-      debugPrint('❌ [Paywall] Restore error: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);

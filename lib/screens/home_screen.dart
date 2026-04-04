@@ -59,11 +59,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _initServices() async {
-    debugPrint('🚀 [HomeScreen] Initializing services...');
     
     // Initialize subscription
     await _subscription.init();
-    debugPrint('   - Subscription initialized, isPremium: ${_subscription.isPremium}');
     
     // Initialize reading counter
     await _readingCounter.init();
@@ -71,7 +69,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     // Initialize ads for free users
     if (!_subscription.isPremium) {
       await _ads.init();
-      debugPrint('   - Ads initialized');
       
       // Set up ad state listener BEFORE loading ad
       _ads.onAdStateChanged = () {
@@ -85,7 +82,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
       
       // Load the banner ad
       await _ads.loadBannerAd();
-      debugPrint('   - Banner ad load initiated');
     }
   }
 

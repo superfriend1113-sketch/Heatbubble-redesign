@@ -24,7 +24,6 @@ class ReadingCounterService {
       _lastPromptTime = DateTime.tryParse(lastPromptStr);
     }
     
-    debugPrint('📊 [ReadingCounter] Initialized: count=$_count');
   }
 
   /// Increment reading count
@@ -34,7 +33,6 @@ class ReadingCounterService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_countKey, _count);
     
-    debugPrint('📊 [ReadingCounter] Count incremented: $_count');
   }
 
   /// Check if upgrade prompt should be shown
@@ -48,7 +46,6 @@ class ReadingCounterService {
     if (_lastPromptTime != null) {
       final minutesSinceLastPrompt = DateTime.now().difference(_lastPromptTime!).inMinutes;
       if (minutesSinceLastPrompt < 5) {
-        debugPrint('📊 [ReadingCounter] Prompt shown recently, skipping');
         return false;
       }
     }
@@ -63,7 +60,6 @@ class ReadingCounterService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_lastPromptKey, _lastPromptTime!.toIso8601String());
     
-    debugPrint('📊 [ReadingCounter] Prompt shown at: $_lastPromptTime');
   }
 
   /// Reset counter (e.g., after upgrade)
@@ -75,7 +71,6 @@ class ReadingCounterService {
     await prefs.remove(_countKey);
     await prefs.remove(_lastPromptKey);
     
-    debugPrint('📊 [ReadingCounter] Counter reset');
   }
 
   /// Get current count

@@ -21,21 +21,15 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
   @override
   void initState() {
     super.initState();
-    debugPrint('═══════════════════════════════════════════════════════');
-    debugPrint('🎨 [AdBannerWidget] initState called');
-    debugPrint('   - isPremium: ${_subscription.isPremium}');
-    debugPrint('═══════════════════════════════════════════════════════');
     
     // Register setState callback so widget rebuilds when ad loads/fails
     _ads.onAdStateChanged = () {
-      debugPrint('🔄 [AdBannerWidget] Ad state changed, rebuilding widget');
       if (mounted) setState(() {});
     };
     
     // Set timeout for ad loading (5 seconds)
     Future.delayed(const Duration(seconds: 5), () {
       if (mounted && !_ads.isAdLoaded) {
-        debugPrint('⏱️  [AdBannerWidget] Ad load timeout - showing fallback');
         setState(() {
           _showFallback = true;
         });
@@ -51,16 +45,13 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('🎨 [AdBannerWidget] build called');
     
     if (_subscription.isPremium) {
-      debugPrint('   - User is premium, hiding ad');
       return const SizedBox.shrink();
     }
 
     // Show fallback if timeout or ad failed
     if (_showFallback || (_ads.lastError != null && !_ads.isAdLoaded)) {
-      debugPrint('   - Showing premium upgrade fallback');
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: PremiumUpgradePrompt(
@@ -73,7 +64,6 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
 
     final adWidget = _ads.getBannerAdWidget();
     if (adWidget == null) {
-      debugPrint('   - No ad widget available, showing loading');
       
       // Show minimal loading indicator
       return Padding(
@@ -109,7 +99,6 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
       );
     }
 
-    debugPrint('   - Showing ad widget');
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
       child: Container(

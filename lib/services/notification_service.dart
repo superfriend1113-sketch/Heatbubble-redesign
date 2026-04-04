@@ -28,12 +28,10 @@ class NotificationService {
   /// Initialize notification service (call once at app startup)
   Future<void> initialize() async {
     if (_initialized) {
-      debugPrint('⚠️  [Notifications] Already initialized');
       return;
     }
 
     try {
-      debugPrint('📬 [Notifications] Initializing notification service...');
       
       // Initialize local notifications
       await _initializeLocalNotifications();
@@ -42,9 +40,7 @@ class NotificationService {
       await _notificationStore.init();
       
       _initialized = true;
-      debugPrint('✅ [Notifications] Service initialized');
     } catch (e) {
-      debugPrint('❌ [Notifications] Initialization failed: $e');
       rethrow;
     }
   }
@@ -114,16 +110,10 @@ class NotificationService {
       androidImpl.createNotificationChannel(generalChannel),
     ]);
 
-    debugPrint('✅ [Notifications] Android channels created');
   }
 
   /// Handle FCM remote message (called in background)
   Future<void> handleRemoteMessage(RemoteMessage message) async {
-    debugPrint('📬 [Notifications] Remote message received (Background)');
-    debugPrint('   Message ID: ${message.messageId}');
-    debugPrint('   Title: ${message.notification?.title}');
-    debugPrint('   Body: ${message.notification?.body}');
-    debugPrint('   Data: ${message.data}');
 
     try {
       // Store notification
@@ -147,16 +137,11 @@ class NotificationService {
         _handleAction(message.data['action']!, message.data);
       }
     } catch (e) {
-      debugPrint('❌ [Notifications] Failed to handle remote message: $e');
     }
   }
 
   /// Handle FCM foreground message
   void handleForegroundMessage(RemoteMessage message) {
-    debugPrint('📬 [Notifications] Remote message received (Foreground)');
-    debugPrint('   Message ID: ${message.messageId}');
-    debugPrint('   Title: ${message.notification?.title}');
-    debugPrint('   Body: ${message.notification?.body}');
 
     try {
       // Delay slightly to ensure app is ready
@@ -175,7 +160,6 @@ class NotificationService {
         await _showLocalNotification(notification);
       });
     } catch (e) {
-      debugPrint('❌ [Notifications] Failed to handle foreground message: $e');
     }
   }
 
@@ -183,8 +167,6 @@ class NotificationService {
   Future<void> handleInitialMessage(RemoteMessage? message) async {
     if (message == null) return;
 
-    debugPrint('📬 [Notifications] Initial message (App launched from notification)');
-    debugPrint('   Message ID: ${message.messageId}');
     
     try {
       // Mark as read
@@ -195,7 +177,6 @@ class NotificationService {
       // Navigate based on data
       _handleAction(message.data['action'], message.data);
     } catch (e) {
-      debugPrint('❌ [Notifications] Failed to handle initial message: $e');
     }
   }
 
@@ -222,9 +203,7 @@ class NotificationService {
         payload: notification.id,
       );
 
-      debugPrint('✅ [Notifications] Local notification shown: ${notification.title}');
     } catch (e) {
-      debugPrint('❌ [Notifications] Failed to show local notification: $e');
     }
   }
 
@@ -261,8 +240,6 @@ class NotificationService {
 
   /// Handle notification response
   void _handleNotificationResponse(NotificationResponse response) {
-    debugPrint('📬 [Notifications] Notification tapped');
-    debugPrint('   Payload: ${response.payload}');
     
     try {
       if (response.payload != null) {
@@ -270,7 +247,6 @@ class NotificationService {
         _notificationStore.markAsRead(response.payload!);
       }
     } catch (e) {
-      debugPrint('❌ [Notifications] Failed to handle notification response: $e');
     }
   }
 
@@ -284,7 +260,6 @@ class NotificationService {
   void _handleAction(String? action, Map<String, dynamic> data) {
     if (action == null) return;
 
-    debugPrint('🔄 [Notifications] Handling action: $action');
 
     switch (action) {
       case 'temperature_alert':
@@ -300,7 +275,6 @@ class NotificationService {
         onNotificationTapped?.call('paywall');
         break;
       default:
-        debugPrint('⚠️  [Notifications] Unknown action: $action');
     }
   }
 

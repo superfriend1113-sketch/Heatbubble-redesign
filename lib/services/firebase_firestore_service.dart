@@ -15,7 +15,6 @@ class FirebaseFirestoreService {
       _firestore ??= FirebaseFirestore.instance;
       return _firestore;
     } catch (e) {
-      debugPrint('⚠️  [Firestore] Firebase not initialized yet: $e');
       return null;
     }
   }
@@ -45,12 +44,10 @@ class FirebaseFirestoreService {
   }) async {
     final usersCollection = users;
     if (usersCollection == null) {
-      debugPrint('❌ [Firestore] Firebase not initialized');
       return;
     }
     
     try {
-      debugPrint('💾 [Firestore] Creating user profile: $userId');
       
       await usersCollection.doc(userId).set({
         'userId': userId,
@@ -61,9 +58,7 @@ class FirebaseFirestoreService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
 
-      debugPrint('✅ [Firestore] User profile created');
     } catch (e) {
-      debugPrint('❌ [Firestore] Create user profile failed: $e');
       rethrow;
     }
   }
@@ -75,21 +70,17 @@ class FirebaseFirestoreService {
   }) async {
     final usersCollection = users;
     if (usersCollection == null) {
-      debugPrint('❌ [Firestore] Firebase not initialized');
       return;
     }
     
     try {
-      debugPrint('💾 [Firestore] Saving user profile: $userId');
       
       await usersCollection.doc(userId).set({
         ...data,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      debugPrint('✅ [Firestore] User profile saved');
     } catch (e) {
-      debugPrint('❌ [Firestore] Save user profile failed: $e');
       rethrow;
     }
   }
@@ -98,24 +89,19 @@ class FirebaseFirestoreService {
   Future<Map<String, dynamic>?> getUserProfile(String userId) async {
     final usersCollection = users;
     if (usersCollection == null) {
-      debugPrint('❌ [Firestore] Firebase not initialized');
       return null;
     }
     
     try {
-      debugPrint('📖 [Firestore] Getting user profile: $userId');
       
       final doc = await usersCollection.doc(userId).get();
       
       if (doc.exists) {
-        debugPrint('✅ [Firestore] User profile found');
         return doc.data() as Map<String, dynamic>?;
       }
       
-      debugPrint('⚠️  [Firestore] User profile not found');
       return null;
     } catch (e) {
-      debugPrint('❌ [Firestore] Get user profile failed: $e');
       rethrow;
     }
   }
@@ -127,12 +113,10 @@ class FirebaseFirestoreService {
   }) async {
     final readingsCollection = readings;
     if (readingsCollection == null) {
-      debugPrint('❌ [Firestore] Firebase not initialized');
       return;
     }
     
     try {
-      debugPrint('💾 [Firestore] Saving temperature reading for user: $userId');
       
       await readingsCollection.add({
         'userId': userId,
@@ -142,9 +126,7 @@ class FirebaseFirestoreService {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      debugPrint('✅ [Firestore] Reading saved');
     } catch (e) {
-      debugPrint('❌ [Firestore] Save reading failed: $e');
       rethrow;
     }
   }
@@ -156,11 +138,9 @@ class FirebaseFirestoreService {
   }) {
     final readingsCollection = readings;
     if (readingsCollection == null) {
-      debugPrint('❌ [Firestore] Firebase not initialized');
       return Stream.value([]);
     }
     
-    debugPrint('📊 [Firestore] Streaming readings for user: $userId');
     
     return readingsCollection
         .where('userId', isEqualTo: userId)
@@ -189,12 +169,10 @@ class FirebaseFirestoreService {
   }) async {
     final subscriptionsCollection = subscriptions;
     if (subscriptionsCollection == null) {
-      debugPrint('❌ [Firestore] Firebase not initialized');
       return;
     }
     
     try {
-      debugPrint('💾 [Firestore] Saving subscription for user: $userId');
       
       await subscriptionsCollection.doc(userId).set({
         'userId': userId,
@@ -205,9 +183,7 @@ class FirebaseFirestoreService {
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      debugPrint('✅ [Firestore] Subscription saved');
     } catch (e) {
-      debugPrint('❌ [Firestore] Save subscription failed: $e');
       rethrow;
     }
   }
@@ -216,24 +192,19 @@ class FirebaseFirestoreService {
   Future<Map<String, dynamic>?> getSubscription(String userId) async {
     final subscriptionsCollection = subscriptions;
     if (subscriptionsCollection == null) {
-      debugPrint('❌ [Firestore] Firebase not initialized');
       return null;
     }
     
     try {
-      debugPrint('📖 [Firestore] Getting subscription for user: $userId');
       
       final doc = await subscriptionsCollection.doc(userId).get();
       
       if (doc.exists) {
-        debugPrint('✅ [Firestore] Subscription found');
         return doc.data() as Map<String, dynamic>?;
       }
       
-      debugPrint('⚠️  [Firestore] Subscription not found');
       return null;
     } catch (e) {
-      debugPrint('❌ [Firestore] Get subscription failed: $e');
       rethrow;
     }
   }
@@ -242,11 +213,9 @@ class FirebaseFirestoreService {
   Stream<Map<String, dynamic>?> streamSubscription(String userId) {
     final subscriptionsCollection = subscriptions;
     if (subscriptionsCollection == null) {
-      debugPrint('❌ [Firestore] Firebase not initialized');
       return Stream.value(null);
     }
     
-    debugPrint('📊 [Firestore] Streaming subscription for user: $userId');
     
     return subscriptionsCollection.doc(userId).snapshots().map((doc) {
       if (doc.exists) {
@@ -263,12 +232,10 @@ class FirebaseFirestoreService {
     final subscriptionsCollection = subscriptions;
     
     if (usersCollection == null || readingsCollection == null || subscriptionsCollection == null) {
-      debugPrint('❌ [Firestore] Firebase not initialized');
       return;
     }
     
     try {
-      debugPrint('🗑️ [Firestore] Deleting all data for user: $userId');
       
       // Delete user profile
       await usersCollection.doc(userId).delete();
@@ -285,9 +252,7 @@ class FirebaseFirestoreService {
       // Delete subscription
       await subscriptionsCollection.doc(userId).delete();
 
-      debugPrint('✅ [Firestore] User data deleted');
     } catch (e) {
-      debugPrint('❌ [Firestore] Delete user data failed: $e');
       rethrow;
     }
   }
@@ -301,12 +266,10 @@ class FirebaseFirestoreService {
     final readingsCollection = readings;
     
     if (firestore == null || readingsCollection == null) {
-      debugPrint('❌ [Firestore] Firebase not initialized');
       return;
     }
     
     try {
-      debugPrint('💾 [Firestore] Batch saving ${readingsList.length} readings');
       
       final batch = firestore.batch();
       
@@ -322,9 +285,7 @@ class FirebaseFirestoreService {
       }
       
       await batch.commit();
-      debugPrint('✅ [Firestore] Batch save completed');
     } catch (e) {
-      debugPrint('❌ [Firestore] Batch save failed: $e');
       rethrow;
     }
   }
@@ -333,7 +294,6 @@ class FirebaseFirestoreService {
   Future<Map<String, dynamic>> getUserStats(String userId) async {
     final readingsCollection = readings;
     if (readingsCollection == null) {
-      debugPrint('❌ [Firestore] Firebase not initialized');
       return {
         'totalReadings': 0,
         'avgTemp': 0.0,
@@ -343,7 +303,6 @@ class FirebaseFirestoreService {
     }
     
     try {
-      debugPrint('📊 [Firestore] Getting stats for user: $userId');
       
       final snapshot = await readingsCollection
           .where('userId', isEqualTo: userId)
@@ -369,7 +328,6 @@ class FirebaseFirestoreService {
       final maxTemp = temps.reduce((a, b) => a > b ? a : b);
       final minTemp = temps.reduce((a, b) => a < b ? a : b);
 
-      debugPrint('✅ [Firestore] Stats calculated');
       
       return {
         'totalReadings': snapshot.docs.length,
@@ -378,7 +336,6 @@ class FirebaseFirestoreService {
         'minTemp': minTemp,
       };
     } catch (e) {
-      debugPrint('❌ [Firestore] Get stats failed: $e');
       rethrow;
     }
   }
