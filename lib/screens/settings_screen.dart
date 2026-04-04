@@ -772,7 +772,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  _infoRow('Version', '1.0.0'),
+                  _infoRow('Version', '1.0.4'),
                   Divider(color: const Color(0xFF111827).withAlpha(20), height: 24),
                   _infoRow('Build', 'MVP'),
                   Divider(color: const Color(0xFF111827).withAlpha(20), height: 24),

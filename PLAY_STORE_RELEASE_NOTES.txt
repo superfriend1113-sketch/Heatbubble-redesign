@@ -1,22 +1,27 @@
-What's New in v1.0.3:
+What's New in v1.0.4:
 
-🚀 PERFORMANCE
-• 5x faster app launch (1-2 seconds vs 8-10 seconds)
-• Fixed crashes and improved stability
+🌡️ TEMPERATURE UNITS
+• Fixed temperature units in all notifications
+• Y-axis in charts now shows correct unit symbols (°C, °F, K)
+• Accurate temperature difference conversions
+• All displays respect your selected unit preference
 
-💰 MONETIZATION
-• Better ad experience with per-screen frequency
-• Premium users: completely ad-free
-
-🔐 IMPROVEMENTS
-• Smoother signup flow
-• Restore purchases feature
-• Better pricing display with 7-day free trial
-• Fixed home widget integration
+🎨 UI IMPROVEMENTS
+• Cleaner settings interface
+• Removed debug elements for production
+• Polished user experience
+• Better visual consistency
 
 🐛 BUG FIXES
-• Resolved Firebase initialization issues
-• Fixed subscription display
-• Improved ad loading reliability
+• Fixed notification unit display issues
+• Corrected temperature difference calculations
+• Improved chart Y-axis labeling
+• Enhanced overall stability
+
+💎 PREMIUM FEATURES
+• No ads ever - completely ad-free experience
+• Custom temperature alerts
+• Automatic cloud backup & sync
+• Advanced analytics
 
 Premium: ₹220/mo or ₹2,250/yr (7-day free trial)

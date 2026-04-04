@@ -1,6 +1,6 @@
 name: heatbubble
 description: Real pocket temperature tracker using device sensors.
-version: 1.0.3+5
+version: 1.0.4+6
 publish_to: 'none'
 
 environment:
