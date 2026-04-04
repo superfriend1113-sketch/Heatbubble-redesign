@@ -82,6 +82,21 @@ class UnitService extends ChangeNotifier {
   String formatValue(double celsius, {int decimals = 1}) =>
       convert(celsius).toStringAsFixed(decimals);
 
+  /// Convert a temperature difference from Celsius to the current unit.
+  /// Differences don't use the offset (no +32 for Fahrenheit, no +273.15 for Kelvin).
+  double convertDifference(double celsiusDiff) {
+    switch (_unit) {
+      case TempUnit.celsius:    return celsiusDiff;
+      case TempUnit.fahrenheit: return celsiusDiff * 9 / 5;  // Only multiply, no offset
+      case TempUnit.kelvin:     return celsiusDiff;          // Same scale as Celsius
+    }
+  }
+
+  /// Format a temperature difference with unit symbol.
+  /// Use this for displaying changes/differences, not absolute temperatures.
+  String formatDifference(double celsiusDiff, {int decimals = 1}) =>
+      '${convertDifference(celsiusDiff).toStringAsFixed(decimals)}$symbol';
+
   // ── Threshold helpers (for state detection) ───────────
   /// Always evaluate state in Celsius regardless of display unit.
   /// Normal body temp range: 35.0–39.9 °C

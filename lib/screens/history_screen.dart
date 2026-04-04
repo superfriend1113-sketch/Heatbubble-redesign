@@ -181,7 +181,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final avgCelsius = temps.reduce((a, b) => a + b) / temps.length;
       
       // Convert to user's selected unit
-      final avgInUserUnit = us.convertFromCelsius(avgCelsius);
+      final avgInUserUnit = us.convert(avgCelsius);
       spots.add(FlSpot(i.toDouble(), avgInUserUnit));
       
       // Format hour label (e.g., "10 AM", "2 PM")

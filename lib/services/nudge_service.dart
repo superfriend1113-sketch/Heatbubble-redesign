@@ -120,7 +120,7 @@ class NudgeService {
     // Test comparison notification with current unit
     final us = UnitService.instance;
     final testDiff = 2.5;
-    final abs = us.format(testDiff);
+    final abs = us.formatDifference(testDiff);
     final message = '🌡️ Up $abs from 3 hours ago — your body is warming up.';
     
     await _sendStandardNotification(message);
@@ -183,7 +183,7 @@ class NudgeService {
 
   String _buildMessage(double diff) {
     final us = UnitService.instance;
-    final absDiff = us.format(diff.abs());
+    final absDiff = us.formatDifference(diff.abs());
     
     if (diff > 0) {
       if (diff >= 6) return "🔥 You're $absDiff hotter than usual — drink water now.";
