@@ -143,6 +143,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Widget _buildChart() {
+    final us = UnitService.instance;
+    
     // Get readings from last 12 hours only
     final now = DateTime.now();
     final twelveHoursAgo = now.subtract(const Duration(hours: 12));
@@ -168,7 +170,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
       byHour[hourKey]!.add(r.temperature);
     }
 
-    // Create spots with hourly averages
+    // Create spots with hourly averages (converted to user's unit)
     final spots = <FlSpot>[];
     final labels = <String>[];
     final sortedHours = byHour.keys.toList()..sort();
@@ -176,8 +178,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
     for (int i = 0; i < sortedHours.length; i++) {
       final hour = sortedHours[i];
       final temps = byHour[hour]!;
-      final avg = temps.reduce((a, b) => a + b) / temps.length;
-      spots.add(FlSpot(i.toDouble(), avg));
+      final avgCelsius = temps.reduce((a, b) => a + b) / temps.length;
+      
+      // Convert to user's selected unit
+      final avgInUserUnit = us.convertFromCelsius(avgCelsius);
+      spots.add(FlSpot(i.toDouble(), avgInUserUnit));
       
       // Format hour label (e.g., "10 AM", "2 PM")
       final hourLabel = hour == 0 ? '12 AM' 
@@ -187,19 +192,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
       labels.add(hourLabel);
     }
 
-    // Calculate Y-axis range
+    // Calculate Y-axis range in user's unit
     final yValues = spots.map((s) => s.y).toList();
     final dataMin = yValues.reduce((a, b) => a < b ? a : b);
     final dataMax = yValues.reduce((a, b) => a > b ? a : b);
-    final minY = ((dataMin - 0.5) / 0.5).floorToDouble() * 0.5;
-    final maxY = ((dataMax + 0.5) / 0.5).ceilToDouble() * 0.5;
+    
+    // Adjust interval based on unit (Kelvin has larger numbers)
+    final interval = us.unit == TempUnit.kelvin ? 1.0 : 0.5;
+    final minY = ((dataMin - interval) / interval).floorToDouble() * interval;
+    final maxY = ((dataMax + interval) / interval).ceilToDouble() * interval;
 
     return LineChart(
       LineChartData(
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
-          horizontalInterval: 0.5,
+          horizontalInterval: interval,
           getDrawingHorizontalLine: (_) => FlLine(
             color: const Color(0xFF111827).withAlpha(20),
             strokeWidth: 0.8,
@@ -211,14 +219,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
           leftTitles: AxisTitles(
             sideTitles: SideTitles(
               showTitles: true,
-              reservedSize: 36,
-              interval: 0.5,
+              reservedSize: 40,
+              interval: interval,
               getTitlesWidget: (value, meta) {
                 if (value == meta.min || value == meta.max) {
                   return const SizedBox.shrink();
                 }
+                // Format based on unit (Kelvin shows no decimals, others show 1 decimal)
+                final formatted = us.unit == TempUnit.kelvin 
+                    ? value.toStringAsFixed(0)
+                    : value.toStringAsFixed(1);
                 return Text(
-                  value.toStringAsFixed(1),
+                  formatted,
                   style: TextStyle(
                     color: const Color(0xFF111827).withAlpha(120),
                     fontSize: 10,
@@ -260,7 +272,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             tooltipRoundedRadius: 8,
             getTooltipItems: (items) => items.map((spot) {
               return LineTooltipItem(
-                UnitService.instance.format(spot.y),
+                us.format(spot.y),
                 const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,
