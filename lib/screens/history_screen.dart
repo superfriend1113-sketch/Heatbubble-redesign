@@ -271,8 +271,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
             getTooltipColor: (_) => const Color(0xFF111827),
             tooltipRoundedRadius: 8,
             getTooltipItems: (items) => items.map((spot) {
+              // spot.y is already in user's unit, just format with symbol
+              final formatted = us.unit == TempUnit.kelvin 
+                  ? spot.y.toStringAsFixed(0)
+                  : spot.y.toStringAsFixed(1);
               return LineTooltipItem(
-                us.format(spot.y),
+                '$formatted${us.symbol}',
                 const TextStyle(
                   color: Colors.white,
                   fontWeight: FontWeight.w600,

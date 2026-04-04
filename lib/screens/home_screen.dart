@@ -467,7 +467,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 Expanded(
                   child: _quickStatCard(
                     'Variance',
-                    '±${_variance.toStringAsFixed(1)}°',
+                    _variance > 0 ? '±${us.formatDifference(_variance)}' : '--',
                   ),
                 ),
                 const SizedBox(width: 10),
