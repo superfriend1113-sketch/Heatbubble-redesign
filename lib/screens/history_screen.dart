@@ -230,7 +230,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     ? value.toStringAsFixed(0)
                     : value.toStringAsFixed(1);
                 return Text(
-                  formatted,
+                  '$formatted${us.symbol}',
                   style: TextStyle(
                     color: const Color(0xFF111827).withAlpha(120),
                     fontSize: 10,
