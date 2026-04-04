@@ -445,4 +445,30 @@ class AdsService {
     _interstitialShownScreens.clear();
     debugPrint('🔄 [AdsService] Session reset - ads can show again');
   }
+
+  /// Force reload all ads (useful for debugging)
+  void forceReloadAllAds() {
+    debugPrint('🔄 [AdsService] Force reloading all ads...');
+    resetSession();
+    disposeBannerAd();
+    loadBannerAd();
+    loadInterstitialAd();
+    loadAppOpenAd();
+  }
+
+  /// Get detailed ad status for debugging
+  Map<String, dynamic> getAdStatus() {
+    return {
+      'isInitialized': _isInitialized,
+      'bannerLoaded': _isAdLoaded,
+      'bannerLoading': _isLoading,
+      'interstitialLoaded': _interstitialAd != null,
+      'appOpenLoaded': _appOpenAd != null,
+      'interstitialShownThisSession': _interstitialShownThisSession,
+      'appOpenShownThisSession': _appOpenShownThisSession,
+      'interstitialShownScreens': _interstitialShownScreens.toList(),
+      'lastError': _lastError,
+      'loadAttempts': _loadAttempts,
+    };
+  }
 }
