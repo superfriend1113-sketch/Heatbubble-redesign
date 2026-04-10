@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:provider/provider.dart';
 import '../services/sensor_service.dart';
 import '../services/storage_service.dart';
 import '../services/unit_service.dart';
@@ -9,6 +10,7 @@ import '../services/ads_service.dart';
 import '../services/reading_counter_service.dart';
 import '../services/smart_sync_service.dart';
 import '../services/home_widget_service.dart';
+import '../services/custom_alert_service.dart';
 import '../models/temp_reading.dart';
 import '../widgets/premium_widgets.dart';
 import '../widgets/ad_failure_banner.dart';
@@ -24,11 +26,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   final _sensor = SensorService();
   final _storage = StorageService();
-  final _subscription = SubscriptionService();
   final _ads = AdsService();
   final _readingCounter = ReadingCounterService();
   final _smartSync = SmartSyncService();
   final _homeWidget = HomeWidgetService();
+  final _customAlerts = CustomAlertService();
 
   double _currentTemp = 0;
   double _avgTemp = 0;
@@ -59,15 +61,14 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   }
 
   Future<void> _initServices() async {
-    
-    // Initialize subscription
-    await _subscription.init();
+    if (!mounted) return;
+    final subscription = context.read<SubscriptionService>();
     
     // Initialize reading counter
     await _readingCounter.init();
     
     // Initialize ads for free users
-    if (!_subscription.isPremium) {
+    if (!subscription.isPremium) {
       await _ads.init();
       
       // Set up ad state listener BEFORE loading ad
@@ -97,6 +98,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
   Future<void> _loadData() async {
     if (_isRefreshing) return; // Prevent multiple simultaneous refreshes
     
+    if (!mounted) return;
+    final subscription = context.read<SubscriptionService>();
+    
     setState(() => _isRefreshing = true);
     _refreshController.repeat(); // Start spinning animation
     
@@ -111,8 +115,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           timestamp: DateTime.now(),
         ));
         
+        // Check custom alerts for premium users
+        if (subscription.isPremium) {
+          await _customAlerts.checkAlerts(temp);
+        }
+        
         // Increment reading counter for free users
-        if (!_subscription.isPremium) {
+        if (!subscription.isPremium) {
           await _readingCounter.increment();
           
           // Check if we should show gentle upgrade prompt
@@ -185,7 +194,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           temperature: temp,
           trend: trend,
           unit: UnitService.instance.unit,
-          isPremium: _subscription.isPremium || kDevHomeWidgetBypass,
+          isPremium: subscription.isPremium || kDevHomeWidgetBypass,
         );
       }
     } catch (_) {
@@ -208,10 +217,12 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     final hPad = (sw * 0.05).clamp(16.0, 24.0);
     final topPad = mq.padding.top;
 
-    return ListenableBuilder(
-      listenable: UnitService.instance,
-      builder: (context, _) {
-        final us = UnitService.instance;
+    return Consumer<SubscriptionService>(
+      builder: (context, subscription, _) {
+        return ListenableBuilder(
+          listenable: UnitService.instance,
+          builder: (context, _) {
+            final us = UnitService.instance;
 
         // AI banner content
         final bool isAlert = _trendLabel == 'Rising' && _currentTemp > 37.5;
@@ -481,7 +492,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
             // ── Home Screen Widget promo card ──
             _HomeWidgetPromoCard(
-              isPremium: _subscription.isPremium,
+              isPremium: subscription.isPremium,
               currentTemp: _currentTemp,
               trendLabel: _trendLabel,
             ),
@@ -489,7 +500,7 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
             const SizedBox(height: 20),
 
             // ── Ad Failure Banner (non-blocking) ──
-            if (!_subscription.isPremium && _showAdFailureBanner)
+            if (!subscription.isPremium && _showAdFailureBanner)
               AdFailureBanner(
                 onDismiss: () {
                   setState(() => _showAdFailureBanner = false);
@@ -497,21 +508,24 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
               ),
 
             // ── Ad Banner for free users (at bottom) ──
-            if (!_subscription.isPremium && !_showAdFailureBanner)
+            if (!subscription.isPremium && !_showAdFailureBanner)
               const AdBannerWidget(),
           ],
         );
+      },
+    );
       },
     );
   }
 
   // ── Unit pill widget ──
   Widget _unitPill(String label, TempUnit? unit, UnitService us) {
+    final subscription = context.read<SubscriptionService>();
     final isActive = unit != null && us.unit == unit;
     return GestureDetector(
       onTap: unit != null ? () {
         // Show interstitial ad once per screen for free users
-        if (!_subscription.isPremium) {
+        if (!subscription.isPremium) {
           _ads.showInterstitialAdForScreen('home');
         }
         us.setUnit(unit);

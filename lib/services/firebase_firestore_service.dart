@@ -166,6 +166,7 @@ class FirebaseFirestoreService {
     String? purchaseId,
     String? productId,
     DateTime? expiryDate,
+    String? purchaseToken,
   }) async {
     final subscriptionsCollection = subscriptions;
     if (subscriptionsCollection == null) {
@@ -179,7 +180,10 @@ class FirebaseFirestoreService {
         'isPremium': isPremium,
         'purchaseId': purchaseId,
         'productId': productId,
+        'purchaseToken': purchaseToken,
         'expiryDate': expiryDate != null ? Timestamp.fromDate(expiryDate) : null,
+        'status': isPremium ? 'active' : 'inactive',
+        'autoRenewing': true,
         'updatedAt': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 

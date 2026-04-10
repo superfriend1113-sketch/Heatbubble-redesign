@@ -72,14 +72,26 @@ class CustomAlertService {
   }
 
   /// Check if alert should trigger for current temperature
-  Future<void> checkAlerts(double currentTempCelsius) async {
+  /// Returns true if any alert was triggered
+  Future<bool> checkAlerts(double currentTempCelsius) async {
     final activeAlerts = await getActiveAlerts();
+    bool anyTriggered = false;
 
     for (final alert in activeAlerts) {
       if (alert.shouldTrigger(currentTempCelsius)) {
-        await _triggerAlert(alert, currentTempCelsius);
+        // Check if we should trigger (avoid spam - only trigger once per 5 minutes)
+        final lastTrigger = await _getLastTriggerTime(alert.id);
+        final now = DateTime.now();
+        
+        if (lastTrigger == null || now.difference(lastTrigger).inMinutes >= 5) {
+          await _triggerAlert(alert, currentTempCelsius);
+          await _setLastTriggerTime(alert.id, now);
+          anyTriggered = true;
+        }
       }
     }
+    
+    return anyTriggered;
   }
 
   /// Trigger notification for alert
@@ -88,12 +100,33 @@ class CustomAlertService {
     alert.triggerCount = (alert.triggerCount ?? 0) + 1;
     await updateAlert(alert);
 
+    // Convert temperature to alert's unit for display
+    double displayTemp = currentTemp;
+    if (alert.unit == 'F') {
+      displayTemp = (currentTemp * 9 / 5) + 32;
+    } else if (alert.unit == 'K') {
+      displayTemp = currentTemp + 273.15;
+    }
+
     // Send notification via nudge service
-    final tempStr = '${currentTemp.toStringAsFixed(1)}°${alert.unit}';
+    final tempStr = '${displayTemp.toStringAsFixed(1)}°${alert.unit}';
+    final thresholdStr = '${alert.threshold.toStringAsFixed(1)}°${alert.unit}';
+    
     await _nudge.sendNotification(
       title: '🚨 ${alert.name}',
-      body: 'Temperature is $tempStr (${alert.condition} ${alert.threshold}${alert.unit})',
+      body: 'Temperature is $tempStr (${alert.condition} $thresholdStr)',
     );
+  }
+
+  // Track last trigger times to avoid spam
+  final Map<int, DateTime> _lastTriggerTimes = {};
+
+  Future<DateTime?> _getLastTriggerTime(int alertId) async {
+    return _lastTriggerTimes[alertId];
+  }
+
+  Future<void> _setLastTriggerTime(int alertId, DateTime time) async {
+    _lastTriggerTimes[alertId] = time;
   }
 
   /// Get alert statistics

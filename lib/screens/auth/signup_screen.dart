@@ -34,6 +34,19 @@ class _SignUpScreenState extends State<SignUpScreen> {
     super.dispose();
   }
 
+  /// Sync subscription after signup: Firebase only
+  Future<void> _syncSubscriptionAfterSignup() async {
+    try {
+      // Firebase is the source of truth
+      await _subscription.syncFromFirebase();
+      
+      // Start listening to real-time subscription changes
+      _subscription.startListening();
+    } catch (e) {
+      // Don't block signup if sync fails
+    }
+  }
+
   Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -55,8 +68,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
           displayName: _nameController.text.trim(),
         );
 
-        // Sync subscription status
-        await _subscription.syncFromFirebase();
+        // Sync subscription: Check Google Play first, then push to Firebase
+        await _syncSubscriptionAfterSignup();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -124,8 +137,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
           );
         }
 
-        // Sync subscription status
-        await _subscription.syncFromFirebase();
+        // Sync subscription: Check Google Play first, then push to Firebase
+        await _syncSubscriptionAfterSignup();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

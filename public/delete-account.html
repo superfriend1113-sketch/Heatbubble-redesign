@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete your account - HeatBubble</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: #fafafa;
+            color: #262626;
+            line-height: 1.5;
+        }
+        
+        .nav {
+            background: white;
+            border-bottom: 1px solid #dbdbdb;
+            padding: 16px 0;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .nav-content {
+            max-width: 935px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .nav-logo {
+            font-size: 22px;
+            font-weight: 600;
+            color: #262626;
+        }
+        
+        .container {
+            max-width: 700px;
+            margin: 40px auto;
+            padding: 0 20px;
+        }
+        
+        .hero {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+        
+        .hero h1 {
+            font-size: 32px;
+            font-weight: 700;
+            color: #262626;
+            margin-bottom: 12px;
+        }
+        
+        .hero p {
+            font-size: 16px;
+            color: #737373;
+        }
+        
+        .card {
+            background: white;
+            border: 1px solid #dbdbdb;
+            border-radius: 8px;
+            padding: 32px;
+            margin-bottom: 24px;
+        }
+        
+        .card h2 {
+            font-size: 20px;
+            font-weight: 600;
+            color: #262626;
+            margin-bottom: 20px;
+        }
+        
+        .option {
+            padding: 24px 0;
+            border-bottom: 1px solid #efefef;
+        }
+        
+        .option:last-child {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+        
+        .option-header {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            margin-bottom: 12px;
+        }
+        
+        .option-icon {
+            width: 48px;
+            height: 48px;
+            background: #f5f5f5;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        
+        .option-icon i {
+            font-size: 20px;
+            color: #262626;
+        }
+        
+        .option-content {
+            flex: 1;
+        }
+        
+        .option-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #262626;
+            margin-bottom: 4px;
+        }
+        
+        .option-desc {
+            font-size: 14px;
+            color: #737373;
+            margin-bottom: 16px;
+        }
+        
+        .steps {
+            margin: 16px 0;
+        }
+        
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin-bottom: 12px;
+            font-size: 14px;
+            color: #262626;
+        }
+        
+        .step-number {
+            width: 24px;
+            height: 24px;
+            background: #f5f5f5;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            font-weight: 600;
+            flex-shrink: 0;
+        }
+        
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #0095f6;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        
+        .btn:hover {
+            background: #1877f2;
+        }
+        
+        .btn i {
+            font-size: 16px;
+        }
+        
+        .alert {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 16px;
+        }
+        
+        .alert-icon {
+            font-size: 24px;
+            color: #856404;
+            flex-shrink: 0;
+        }
+        
+        .alert-content h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #856404;
+            margin-bottom: 8px;
+        }
+        
+        .alert-content p {
+            font-size: 14px;
+            color: #856404;
+            line-height: 1.6;
+        }
+        
+        .info-grid {
+            display: grid;
+            gap: 12px;
+            margin-top: 16px;
+        }
+        
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: #fafafa;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #262626;
+        }
+        
+        .info-item i {
+            color: #0095f6;
+            font-size: 16px;
+            width: 20px;
+            text-align: center;
+        }
+        
+        .help-section {
+            text-align: center;
+            padding: 32px;
+            background: #fafafa;
+            border-radius: 8px;
+            margin-top: 24px;
+        }
+        
+        .help-section h3 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #262626;
+            margin-bottom: 8px;
+        }
+        
+        .help-section p {
+            font-size: 14px;
+            color: #737373;
+            margin-bottom: 16px;
+        }
+        
+        .help-email {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: #0095f6;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 32px 20px;
+            color: #737373;
+            font-size: 12px;
+        }
+        
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .footer-links a {
+            color: #737373;
+            text-decoration: none;
+        }
+        
+        .footer-links a:hover {
+            text-decoration: underline;
+        }
+        
+        @media (max-width: 768px) {
+            .hero h1 {
+                font-size: 24px;
+            }
+            
+            .card {
+                padding: 24px 20px;
+            }
+            
+            .option {
+                padding: 20px 0;
+            }
+            
+            .option-header {
+                gap: 12px;
+            }
+            
+            .option-icon {
+                width: 40px;
+                height: 40px;
+            }
+            
+            .option-icon i {
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="nav">
+        <div class="nav-content">
+            <span class="nav-logo">HeatBubble</span>
+        </div>
+    </nav>
+
+    <div class="container">
+        <div class="hero">
+            <h1>Delete your account</h1>
+            <p>We're sorry to see you go. Here's how you can delete your account.</p>
+        </div>
+
+        <div class="alert">
+            <div class="alert-icon">
+                <i class="fas fa-exclamation-triangle"></i>
+            </div>
+            <div class="alert-content">
+                <h3>This can't be undone</h3>
+                <p>Once you delete your account, there's no getting it back. Make sure you want to do this.</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>How to delete your account</h2>
+            
+            <div class="option">
+                <div class="option-header">
+                    <div class="option-icon">
+                        <i class="fas fa-mobile-alt"></i>
+                    </div>
+                    <div class="option-content">
+                        <div class="option-title">From the app</div>
+                        <div class="option-desc">The easiest way to delete your account</div>
+                    </div>
+                </div>
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">1</div>
+                        <div>Open HeatBubble and go to your profile</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">2</div>
+                        <div>Tap Settings in the top right</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">3</div>
+                        <div>Scroll down and tap Delete Account</div>
+                    </div>
+                    <div class="step">
+                        <div class="step-number">4</div>
+                        <div>Follow the instructions to confirm</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="option">
+                <div class="option-header">
+                    <div class="option-icon">
+                        <i class="fas fa-envelope"></i>
+                    </div>
+                    <div class="option-content">
+                        <div class="option-title">Can't access the app?</div>
+                        <div class="option-desc">Send us an email and we'll help you out</div>
+                    </div>
+                </div>
+                <p style="font-size: 14px; color: #737373; margin-bottom: 16px;">
+                    Email us from the address associated with your account. Include "Delete My Account" in the subject line.
+                </p>
+                <a href="mailto:heatbubble2026@gmail.com?subject=Delete%20My%20Account" class="btn">
+                    <i class="fas fa-paper-plane"></i>
+                    Email support
+                </a>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>What gets deleted</h2>
+            <div class="info-grid">
+                <div class="info-item">
+                    <i class="fas fa-user"></i>
+                    <span>Your profile and account info</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-thermometer-half"></i>
+                    <span>All temperature readings and history</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-bell"></i>
+                    <span>Custom alerts and preferences</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-crown"></i>
+                    <span>Subscription and purchase history</span>
+                </div>
+                <div class="info-item">
+                    <i class="fas fa-cloud"></i>
+                    <span>Cloud backups and synced data</span>
+                </div>
+            </div>
+            <p style="font-size: 13px; color: #737373; margin-top: 20px; line-height: 1.6;">
+                Your data will be permanently deleted within 30 days. Some anonymized analytics may be kept for legal reasons, but can't be linked back to you.
+            </p>
+        </div>
+
+        <div class="help-section">
+            <h3>Need help?</h3>
+            <p>Have questions about deleting your account or your data?</p>
+            <a href="mailto:heatbubble2026@gmail.com" class="help-email">
+                <i class="fas fa-question-circle"></i>
+                Contact support
+            </a>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <p>&copy; 2026 HeatBubble</p>
+        <div class="footer-links">
+            <a href="privacy-policy.html">Privacy</a>
+            <a href="terms.html">Terms</a>
+            <a href="mailto:heatbubble2026@gmail.com">Support</a>
+        </div>
+    </footer>
+</body>
+</html>

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/firebase_auth_service.dart';
+import '../../services/firebase_firestore_service.dart';
 import '../../services/subscription_service.dart';
 import 'signup_screen.dart';
+import 'forgot_password_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -13,6 +15,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _auth = FirebaseAuthService();
+  final _firestore = FirebaseFirestoreService();
   final _subscription = SubscriptionService();
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
@@ -28,22 +31,70 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  /// Ensure user profile exists in Firestore (create if missing)
+  Future<void> _ensureUserProfile(User user) async {
+    try {
+      // Check if profile already exists
+      final existingProfile = await _firestore.getUserProfile(user.uid);
+      
+      if (existingProfile == null) {
+        // Create new profile
+        await _firestore.createUserProfile(
+          userId: user.uid,
+          email: user.email ?? '',
+          displayName: user.displayName,
+          photoURL: user.photoURL,
+        );
+      } else {
+        // Update profile with latest info from Firebase Auth
+        await _firestore.saveUserProfile(
+          userId: user.uid,
+          data: {
+            'email': user.email ?? existingProfile['email'],
+            'displayName': user.displayName ?? existingProfile['displayName'],
+            'photoURL': user.photoURL ?? existingProfile['photoURL'],
+          },
+        );
+      }
+    } catch (e) {
+      // Don't block login if profile creation fails
+    }
+  }
+
+  /// Sync subscription after login: Firebase only
+  Future<void> _syncSubscriptionAfterLogin() async {
+    try {
+      // Firebase is the source of truth
+      await _subscription.syncFromFirebase();
+      
+      // Start listening to real-time subscription changes
+      _subscription.startListening();
+    } catch (e) {
+      // Don't block login if sync fails
+    }
+  }
+
   Future<void> _signIn() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      await _auth.signInWithEmail(
+      final credential = await _auth.signInWithEmail(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
-      // Sync subscription from Firebase
-      await _subscription.syncFromFirebase();
+      if (credential?.user != null) {
+        // Ensure user profile exists in Firestore
+        await _ensureUserProfile(credential!.user!);
 
-      if (mounted) {
-        Navigator.of(context).pop();
+        // Sync subscription: Check Google Play first, then sync to Firebase
+        await _syncSubscriptionAfterLogin();
+
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
       }
     } on FirebaseAuthException catch (e) {
       if (mounted) {
@@ -71,8 +122,11 @@ class _LoginScreenState extends State<LoginScreen> {
       final credential = await _auth.signInWithGoogle();
       
       if (credential?.user != null) {
-        // Sync subscription from Firebase
-        await _subscription.syncFromFirebase();
+        // Ensure user profile exists in Firestore
+        await _ensureUserProfile(credential!.user!);
+
+        // Sync subscription: Check Google Play first, then sync to Firebase
+        await _syncSubscriptionAfterLogin();
 
         if (mounted) {
           Navigator.of(context).pop();
@@ -249,7 +303,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Forgot password
                 TextButton(
                   onPressed: () {
-                    // TODO: Navigate to forgot password screen
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ForgotPasswordScreen(),
+                      ),
+                    );
                   },
                   child: Text(
                     'Forgot Password?',

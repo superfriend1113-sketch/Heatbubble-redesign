@@ -3,6 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/material.dart';
 import 'firebase_auth_service.dart';
 import 'firebase_firestore_service.dart';
+import 'home_widget_service.dart';
+import 'storage_service.dart';
+import 'unit_service.dart';
 
 /// Manages the HeatBubble subscription state.
 ///
@@ -11,7 +14,7 @@ import 'firebase_firestore_service.dart';
 ///   • Annual   — $19.99/year  — auto-renews every 12 months
 ///   Both plans include a **7-day free trial** for first-time subscribers
 ///   (enforced by Google Play; no code change needed).
-class SubscriptionService {
+class SubscriptionService extends ChangeNotifier {
   static final SubscriptionService _instance = SubscriptionService._internal();
   factory SubscriptionService() => _instance;
   SubscriptionService._internal();
@@ -19,9 +22,12 @@ class SubscriptionService {
   final InAppPurchase iap = InAppPurchase.instance;
   final _auth      = FirebaseAuthService();
   final _firestore = FirebaseFirestoreService();
+  final _homeWidget = HomeWidgetService();
+  final _storage = StorageService();
 
   bool _isPremium = false;
   List<ProductDetails> _products = [];
+  StreamSubscription<DocumentSnapshot>? _subscriptionListener;
 
   // ── Product IDs (must match Play Console exactly) ──────────────────────
   static const String monthlySubscriptionId = 'heatbubble_premium_monthly'; // $1.99/mo
@@ -56,6 +62,11 @@ class SubscriptionService {
   Future<void> init() async {
     await _loadPremiumStatus();
     await _initializeProducts();
+    
+    // Listen to subscription changes in real-time
+    if (_auth.isSignedIn) {
+      _listenToSubscriptionChanges();
+    }
   }
 
   Future<void> _loadPremiumStatus() async {
@@ -119,8 +130,14 @@ class SubscriptionService {
       return false;
     }
     try {
-      // Subscriptions use buyNonConsumable (they are not consumed)
-      final PurchaseParam param = PurchaseParam(productDetails: product);
+      // Pass Firebase UID as obfuscatedAccountId so backend can link purchase to user
+      final String? userId = _auth.isSignedIn ? _auth.currentUser?.uid : null;
+      
+      final PurchaseParam param = PurchaseParam(
+        productDetails: product,
+        applicationUserName: userId, // This becomes obfuscatedExternalAccountId
+      );
+      
       await iap.buyNonConsumable(purchaseParam: param);
       return true;
     } catch (e) {
@@ -164,9 +181,45 @@ class SubscriptionService {
           purchaseId: purchaseId,
           productId: productId,
           expiryDate: expiry,
+          purchaseToken: purchaseId, // Save purchase token for backend verification
         );
       } catch (e) {
       }
+    }
+
+    // Update home screen widget with new premium status
+    await _updateWidget();
+    
+    // Notify all listeners (UI will update automatically)
+    notifyListeners();
+  }
+
+  /// Update the home screen widget with current temperature and premium status
+  Future<void> _updateWidget() async {
+    try {
+      final latest = await _storage.getLatest();
+      if (latest != null) {
+        // Calculate trend from last 24 hours
+        final readings = await _storage.getLast24Hours();
+        String trend = 'Stable';
+        if (readings.length >= 2) {
+          final diff = latest.temperature - readings[readings.length - 2].temperature;
+          if (diff > 0.3) {
+            trend = 'Rising';
+          } else if (diff < -0.3) {
+            trend = 'Falling';
+          }
+        }
+
+        await _homeWidget.updateWidget(
+          temperature: latest.temperature,
+          trend: trend,
+          unit: UnitService.instance.unit,
+          isPremium: _isPremium,
+        );
+      }
+    } catch (e) {
+      // Widget update failed, but don't block premium status change
     }
   }
 
@@ -193,6 +246,12 @@ class SubscriptionService {
         _isPremium = isPremium;
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool(_premiumKey, isPremium);
+
+        // Update widget with synced premium status
+        await _updateWidget();
+        
+        // Notify all listeners (UI updates automatically)
+        notifyListeners();
       }
     } catch (e) {
     }
@@ -209,6 +268,9 @@ class SubscriptionService {
       
       // Reload premium status from local storage
       await _loadPremiumStatus();
+
+      // Update widget with restored premium status
+      await _updateWidget();
       
       return _isPremium;
       
@@ -228,5 +290,81 @@ class SubscriptionService {
   Future<String?> getActivePlanId() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getString(_productIdKey);
+  }
+
+  // ── Real-time subscription listener ────────────────────────────────────
+
+  /// Listen to subscription changes in Firestore in real-time
+  /// This allows instant updates when backend changes subscription status
+  void _listenToSubscriptionChanges() {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return;
+
+    _subscriptionListener?.cancel(); // Cancel existing listener if any
+
+    _subscriptionListener = _firestore.subscriptions
+        ?.doc(userId)
+        .snapshots()
+        .listen((snapshot) {
+      if (snapshot.exists) {
+        final data = snapshot.data() as Map<String, dynamic>;
+        final isPremium = data['isPremium'] as bool? ?? false;
+        final status = data['status'] as String? ?? 'inactive';
+
+        // Update local state if changed
+        if (_isPremium != isPremium) {
+          _isPremium = isPremium;
+          _savePremiumStatus(isPremium);
+          _updateWidget();
+          notifyListeners();
+
+          // Show message to user based on status
+          if (!isPremium) {
+            if (status == 'expired') {
+              print('⚠️ Your subscription has expired');
+            } else if (status == 'cancelled') {
+              print('⚠️ Your subscription was cancelled');
+            } else if (status == 'paused') {
+              print('⚠️ Your subscription is paused');
+            }
+          }
+        }
+
+        // Update status even if premium status hasn't changed
+        if (status == 'cancelled' && isPremium) {
+          print('⚠️ Your subscription is cancelled but still active until expiry');
+        } else if (status == 'grace_period' && isPremium) {
+          print('⚠️ Payment issue - subscription in grace period');
+        } else if (status == 'on_hold' && isPremium) {
+          print('⚠️ Payment issue - subscription on hold');
+        }
+      }
+    }, onError: (error) {
+      print('Error listening to subscription changes: $error');
+    });
+  }
+
+  Future<void> _savePremiumStatus(bool isPremium) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_premiumKey, isPremium);
+  }
+
+  /// Start listening to subscription changes (call after sign-in)
+  void startListening() {
+    if (_auth.isSignedIn) {
+      _listenToSubscriptionChanges();
+    }
+  }
+
+  /// Stop listening to subscription changes (call on sign-out)
+  void stopListening() {
+    _subscriptionListener?.cancel();
+    _subscriptionListener = null;
+  }
+
+  @override
+  void dispose() {
+    _subscriptionListener?.cancel();
+    super.dispose();
   }
 }

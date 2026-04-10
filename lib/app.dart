@@ -2,6 +2,8 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:provider/provider.dart';
+import 'services/subscription_service.dart';
 import 'screens/home_screen.dart';
 import 'screens/history_screen.dart';
 import 'screens/ai_screen.dart';
@@ -17,23 +19,26 @@ class HeatBubbleApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final interFamily = GoogleFonts.inter().fontFamily!;
 
-    return MaterialApp(
-      title: 'HeatBubble',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.light,
-        scaffoldBackgroundColor: Colors.transparent,
-        colorScheme: const ColorScheme.light(
-          primary: Color(0xFFFF6B35),
-          secondary: Color(0xFF4FC3F7),
-          surface: Colors.transparent,
-          onSurface: Color(0xFF111827),
+    return ChangeNotifierProvider.value(
+      value: SubscriptionService(),
+      child: MaterialApp(
+        title: 'HeatBubble',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          brightness: Brightness.light,
+          scaffoldBackgroundColor: Colors.transparent,
+          colorScheme: const ColorScheme.light(
+            primary: Color(0xFFFF6B35),
+            secondary: Color(0xFF4FC3F7),
+            surface: Colors.transparent,
+            onSurface: Color(0xFF111827),
+          ),
+          fontFamily: interFamily,
+          textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme),
+          useMaterial3: true,
         ),
-        fontFamily: interFamily,
-        textTheme: GoogleFonts.interTextTheme(ThemeData.light().textTheme),
-        useMaterial3: true,
+        home: showOnboarding ? const OnboardingScreen() : const AppShell(),
       ),
-      home: showOnboarding ? const OnboardingScreen() : const AppShell(),
     );
   }
 }

@@ -2,7 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
+import 'package:provider/provider.dart';
 import '../services/subscription_service.dart';
+import '../services/firebase_auth_service.dart';
+import 'auth/login_screen.dart';
 
 class PaywallScreen extends StatefulWidget {
   const PaywallScreen({super.key});
@@ -12,7 +15,7 @@ class PaywallScreen extends StatefulWidget {
 }
 
 class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProviderStateMixin {
-  final _subscription = SubscriptionService();
+  final _auth = FirebaseAuthService();
   final InAppPurchase _iap = InAppPurchase.instance;
   
   bool _isLoading = true;
@@ -47,9 +50,6 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
         _showError('Purchase failed: $error');
       },
     );
-
-    // Initialize subscription service
-    await _subscription.init();
     
     setState(() => _isLoading = false);
   }
@@ -74,8 +74,11 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
   }
 
   Future<void> _handleSuccessfulPurchase(PurchaseDetails purchase) async {
+    if (!mounted) return;
+    final subscription = context.read<SubscriptionService>();
+    
     try {
-      await _subscription.setPremium(
+      await subscription.setPremium(
         true,
         purchaseId: purchase.purchaseID,
         productId: purchase.productID,
@@ -100,13 +103,57 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
   Future<void> _purchaseProduct(String productId) async {
     if (_isPurchasing) return;
 
+    // Require sign-in before purchase
+    if (!_auth.isSignedIn) {
+      final signedIn = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+      
+      if (signedIn != true || !_auth.isSignedIn) {
+        _showError('Please sign in to purchase premium');
+        return;
+      }
+      
+      // After successful sign-in, automatically fetch premium status from Firebase
+      if (mounted) {
+        setState(() => _isLoading = true);
+        final subscription = context.read<SubscriptionService>();
+        
+        try {
+          await subscription.syncFromFirebase();
+          
+          if (!mounted) return;
+          
+          // If user is already premium, close paywall
+          if (subscription.isPremium) {
+            _showSuccess('Welcome back! Your premium subscription is active 🎉');
+            await Future.delayed(const Duration(seconds: 1));
+            if (mounted) {
+              Navigator.pop(context, true);
+            }
+            return;
+          }
+        } catch (e) {
+          // Continue to purchase even if sync fails
+        } finally {
+          if (mounted) {
+            setState(() => _isLoading = false);
+          }
+        }
+      }
+    }
+
+    if (!mounted) return;
+    final subscription = context.read<SubscriptionService>();
+
     setState(() {
       _isPurchasing = true;
       _selectedProductId = productId;
     });
 
     try {
-      final product = _subscription.products.firstWhere(
+      final product = subscription.products.firstWhere(
         (p) => p.id == productId,
         orElse: () => throw Exception('Product not found. Please try again.'),
       );
@@ -123,14 +170,31 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
   Future<void> _restorePurchases() async {
     if (_isLoading) return;
     
+    // Require sign-in to restore
+    if (!_auth.isSignedIn) {
+      final signedIn = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+      
+      if (signedIn != true || !_auth.isSignedIn) {
+        _showError('Please sign in to restore purchases');
+        return;
+      }
+    }
+    
+    if (!mounted) return;
+    final subscription = context.read<SubscriptionService>();
+    
     setState(() => _isLoading = true);
     
     try {
-      final success = await _subscription.restorePurchases();
+      // Automatically fetch from Firebase
+      await subscription.syncFromFirebase();
       
       if (!mounted) return;
       
-      if (success) {
+      if (subscription.isPremium) {
         _showSuccess('Premium restored successfully! 🎉');
         // Wait a moment then close the paywall
         await Future.delayed(const Duration(seconds: 1));
@@ -138,7 +202,7 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
           Navigator.pop(context, true);
         }
       } else {
-        _showError('No active subscriptions found. Purchase a plan to continue.');
+        _showError('No active subscription found in your account');
       }
     } catch (e) {
       if (!mounted) return;
@@ -160,6 +224,7 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
         ),
         backgroundColor: Colors.red,
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -174,6 +239,7 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
         ),
         backgroundColor: Colors.green,
         behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -189,36 +255,38 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
     
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: screenHeight * 0.9,
-      ),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFFFFF5F0),
-            Colors.white,
-          ],
-        ),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      child: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6B35)),
-              ),
-            )
-          : FadeTransition(
-              opacity: _fadeAnimation,
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
+    return Consumer<SubscriptionService>(
+      builder: (context, subscription, _) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: screenHeight * 0.9,
+          ),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFFFFF5F0),
+                Colors.white,
+              ],
+            ),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: _isLoading
+              ? const Center(
+                  child: CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Color(0xFFFF6B35)),
+                  ),
+                )
+              : FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
                       // Drag handle
                       Center(
                         child: Container(
@@ -312,12 +380,12 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
                       const SizedBox(height: 32),
 
                       // Price options
-                      if (_subscription.products.isNotEmpty) ...[
+                      if (subscription.products.isNotEmpty) ...[
                         // Annual — best value (highlighted)
                         _buildPriceOption(
                           productId: SubscriptionService.annualSubscriptionId,
                           title: 'Annual Plan',
-                          price: _getProductPrice(SubscriptionService.annualSubscriptionId),
+                          price: _getProductPrice(SubscriptionService.annualSubscriptionId, subscription),
                           period: 'Billed annually • Cancel anytime',
                           isBestValue: true,
                           savings: 'Save 17%',
@@ -327,7 +395,7 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
                         _buildPriceOption(
                           productId: SubscriptionService.monthlySubscriptionId,
                           title: 'Monthly Plan',
-                          price: _getProductPrice(SubscriptionService.monthlySubscriptionId),
+                          price: _getProductPrice(SubscriptionService.monthlySubscriptionId, subscription),
                           period: 'Billed monthly • Cancel anytime',
                           isBestValue: false,
                           savings: null,
@@ -381,6 +449,8 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
                 ),
               ),
             ),
+        );
+      },
     );
   }
 
@@ -606,9 +676,9 @@ class _PaywallScreenState extends State<PaywallScreen> with SingleTickerProvider
     );
   }
 
-  String _getProductPrice(String productId) {
+  String _getProductPrice(String productId, SubscriptionService subscription) {
     try {
-      final product = _subscription.products.firstWhere((p) => p.id == productId);
+      final product = subscription.products.firstWhere((p) => p.id == productId);
       
       // If Google Play returns "Free" (happens in testing/unpublished products),
       // show the actual prices as fallback

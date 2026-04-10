@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:provider/provider.dart';
 import '../services/unit_service.dart';
 import '../services/subscription_service.dart';
 import '../services/firebase_auth_service.dart';
@@ -8,6 +9,7 @@ import '../services/firebase_sync_service.dart';
 import '../services/firebase_firestore_service.dart';
 import '../services/nudge_service.dart';
 import '../services/ads_service.dart';
+import '../services/app_update_service.dart';
 import '../screens/paywall_screen.dart';
 import '../screens/custom_alerts_screen.dart';
 import '../screens/auth/login_screen.dart';
@@ -27,7 +29,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _trendAlerts = true;
   bool _dailyReminders = false;
   
-  final _subscription = SubscriptionService();
   final _auth = FirebaseAuthService();
   final _sync = FirebaseSyncService();
   final _firestore = FirebaseFirestoreService();
@@ -39,7 +40,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _subscription.init();
     _loadCloudData();
     _loadNotificationPreferences();
   }
@@ -154,23 +154,155 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _checkForUpdates() async {
+    // Show loading indicator
+    if (!mounted) return;
+    
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text(
+          'Checking for updates...',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFF6B7280),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+
+    try {
+      final updateAvailable = await AppUpdateService().checkForCriticalUpdate();
+      
+      if (!mounted) return;
+      
+      if (!updateAvailable) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text(
+              'You\'re on the latest version! 🎉',
+              style: TextStyle(color: Colors.white),
+            ),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
+      // If update is available, the service will handle showing the update dialog
+    } catch (e) {
+      if (!mounted) return;
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Failed to check for updates. Please try again.',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        title: const Text(
+          'Delete Account',
+          style: TextStyle(
+            color: Colors.red,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: const Text(
+          'This will permanently delete your account and all data. This action cannot be undone.\n\nAll your temperature readings, alerts, and preferences will be lost forever.',
+          style: TextStyle(
+            color: Color(0xFF6B7280),
+            fontSize: 14,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            style: TextButton.styleFrom(
+              foregroundColor: const Color(0xFF6B7280),
+            ),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text('Delete Forever'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      // Delete cloud data first
+      await _sync.clearCloudData();
+      
+      // Delete account
+      await _auth.deleteAccount();
+      
+      if (mounted) {
+        _showMessage('Account deleted successfully', isError: false);
+      }
+    } catch (e) {
+      _showMessage('Delete failed: $e');
+    }
+  }
+
   Future<void> _restorePurchases() async {
+    // Require sign-in before restore
+    if (!_auth.isSignedIn) {
+      final signedIn = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+      
+      if (signedIn != true || !_auth.isSignedIn) {
+        _showMessage('Please sign in to restore purchases', isError: true);
+        return;
+      }
+    }
+    
+    if (!mounted) return;
+    final subscription = context.read<SubscriptionService>();
+    
     try {
       _showMessage('Restoring purchases...', isError: false);
       
-      final success = await _subscription.restorePurchases();
+      // Automatically fetch from Firebase
+      await subscription.syncFromFirebase();
       
       if (!mounted) return;
       
-      if (success) {
+      if (subscription.isPremium) {
         _showMessage('Premium restored successfully! 🎉', isError: false);
-        setState(() {}); // Refresh UI
       } else {
-        _showMessage('No active subscriptions found', isError: true);
+        _showMessage('No active subscription found in your account', isError: true);
       }
     } catch (e) {
       if (!mounted) return;
-      _showMessage('Failed to restore purchases', isError: true);
+      _showMessage('Failed to restore purchases. Please try again.', isError: true);
     }
   }
 
@@ -184,6 +316,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           style: const TextStyle(color: Colors.white),
         ),
         backgroundColor: isError ? Colors.red : Colors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       ),
     );
   }
@@ -195,11 +329,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final hPad = (sw * 0.05).clamp(16.0, 24.0);
     final topPad = mq.padding.top;
 
-    return ListenableBuilder(
-      listenable: UnitService.instance,
-      builder: (context, _) {
-        final us = UnitService.instance;
-        return ListView(
+    return Consumer<SubscriptionService>(
+      builder: (context, subscription, _) {
+        return ListenableBuilder(
+          listenable: UnitService.instance,
+          builder: (context, _) {
+            final us = UnitService.instance;
+            return ListView(
           padding: EdgeInsets.fromLTRB(hPad, topPad + 20, hPad, 32),
           children: [
             // ── Header ──
@@ -439,7 +575,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: _subscription.isPremium
+                      color: subscription.isPremium
                           ? const Color(0xFFFF6B35).withAlpha(30)
                           : Colors.grey[300],
                       borderRadius: BorderRadius.circular(8),
@@ -451,18 +587,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              _subscription.isPremium ? 'Premium Active' : 'Free Tier',
+                              subscription.isPremium ? 'Premium Active' : 'Free Tier',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.bold,
-                                color: _subscription.isPremium
+                                color: subscription.isPremium
                                     ? const Color(0xFFFF6B35)
                                     : Colors.grey[700],
                               ),
                             ),
-                            if (_subscription.isPremium)
+                            if (subscription.isPremium)
                               FutureBuilder<String?>(
-                                future: _subscription.getPurchaseDate(),
+                                future: subscription.getPurchaseDate(),
                                 builder: (context, snap) {
                                   return Text(
                                     snap.data ?? 'Lifetime access',
@@ -475,7 +611,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               ),
                           ],
                         ),
-                        if (!_subscription.isPremium)
+                        if (!subscription.isPremium)
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFFFF6B35),
@@ -493,27 +629,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ],
                     ),
                   ),
-                  if (_subscription.isPremium) ...[
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: _restorePurchases,
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF111827),
-                          side: const BorderSide(color: Color(0xFF111827)),
-                        ),
-                        child: const Text('Restore Purchases'),
+                  // Always show restore button (for users who purchased on another device)
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _restorePurchases,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFF111827),
+                        side: const BorderSide(color: Color(0xFF111827)),
                       ),
+                      child: const Text('Restore Purchases'),
                     ),
-                  ],
+                  ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
 
             // ── Custom Alerts (Premium Feature) ──
-            if (_subscription.isPremium)
+            if (subscription.isPremium)
               _glassCard(
                 child: GestureDetector(
                   onTap: () {
@@ -563,7 +698,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ),
-            if (_subscription.isPremium) const SizedBox(height: 20),
+            if (subscription.isPremium) const SizedBox(height: 20),
 
             // ── Temperature Unit ──
             _glassCard(
@@ -636,7 +771,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     value: _notificationsEnabled,
                     onChanged: (v) async {
                       // Show interstitial ad once per screen for free users
-                      if (!_subscription.isPremium) {
+                      if (!subscription.isPremium) {
                         await _ads.showInterstitialAdForScreen('settings');
                       }
                       
@@ -654,7 +789,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       value: _temperatureAlerts,
                       onChanged: (v) async {
                         // Show interstitial ad once per screen for free users
-                        if (!_subscription.isPremium) {
+                        if (!subscription.isPremium) {
                           await _ads.showInterstitialAdForScreen('settings');
                         }
                         
@@ -669,7 +804,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       value: _trendAlerts,
                       onChanged: (v) async {
                         // Show interstitial ad once per screen for free users
-                        if (!_subscription.isPremium) {
+                        if (!subscription.isPremium) {
                           await _ads.showInterstitialAdForScreen('settings');
                         }
                         
@@ -684,7 +819,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       value: _dailyReminders,
                       onChanged: (v) async {
                         // Show interstitial ad once per screen for free users
-                        if (!_subscription.isPremium) {
+                        if (!subscription.isPremium) {
                           await _ads.showInterstitialAdForScreen('settings');
                         }
                         
@@ -726,7 +861,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     value: _autoDetectSensors,
                     onChanged: (v) async {
                       // Show interstitial ad once per screen for free users
-                      if (!_subscription.isPremium) {
+                      if (!subscription.isPremium) {
                         await _ads.showInterstitialAdForScreen('settings');
                       }
                       
@@ -740,7 +875,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     value: _batteryFallback,
                     onChanged: (v) async {
                       // Show interstitial ad once per screen for free users
-                      if (!_subscription.isPremium) {
+                      if (!subscription.isPremium) {
                         await _ads.showInterstitialAdForScreen('settings');
                       }
                       
@@ -751,6 +886,83 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const SizedBox(height: 20),
+
+            // ── Danger Zone (Delete Account) ──
+            if (_auth.isSignedIn) ...[
+              _glassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(LucideIcons.triangleAlert, size: 18, color: Colors.red),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Danger Zone',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.red.withAlpha(30),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.red.withAlpha(100)),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Row(
+                            children: [
+                              Icon(LucideIcons.trash2, size: 16, color: Colors.red),
+                              SizedBox(width: 8),
+                              Text(
+                                'Delete Account',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Permanently delete your account and all data. This cannot be undone.',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.grey[700],
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: _deleteAccount,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.red,
+                                foregroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                              ),
+                              child: const Text('Delete My Account'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
 
             // ── App Information ──
             _glassCard(
@@ -772,11 +984,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ],
                   ),
                   const SizedBox(height: 18),
-                  _infoRow('Version', '1.0.4'),
+                  _infoRow('Version', '1.0.8'),
                   Divider(color: const Color(0xFF111827).withAlpha(20), height: 24),
                   _infoRow('Build', 'MVP'),
                   Divider(color: const Color(0xFF111827).withAlpha(20), height: 24),
                   _infoRow('Developer', 'HeatBubble Team'),
+                  Divider(color: const Color(0xFF111827).withAlpha(20), height: 24),
+                  // Check for updates button
+                  InkWell(
+                    onTap: _checkForUpdates,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'Check for Updates',
+                            style: TextStyle(
+                              color: Color(0xFF111827),
+                              fontSize: 14,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const Icon(
+                            LucideIcons.refreshCw,
+                            size: 16,
+                            color: Color(0xFFFF6B35),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -807,6 +1046,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
           ],
+            );
+          },
         );
       },
     );
@@ -819,11 +1060,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required TempUnit unit,
     required UnitService us,
   }) {
+    final subscription = context.read<SubscriptionService>();
     final isActive = us.unit == unit;
     return GestureDetector(
       onTap: () async {
         // Show interstitial ad once per screen for free users
-        if (!_subscription.isPremium) {
+        if (!subscription.isPremium) {
           await _ads.showInterstitialAdForScreen('settings');
         }
         

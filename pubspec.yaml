@@ -1,6 +1,6 @@
 name: heatbubble
 description: Real pocket temperature tracker using device sensors.
-version: 1.0.4+6
+version: 1.0.8+10
 publish_to: 'none'
 
 environment:
@@ -9,6 +9,9 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+
+  # In-App Updates (Google Play)
+  in_app_update: ^4.2.3
 
   cupertino_icons: ^1.0.8
 

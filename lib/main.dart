@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -16,7 +15,7 @@ import 'services/firebase_auth_service.dart';
 import 'services/subscription_service.dart';
 import 'services/home_widget_service.dart';
 import 'services/ads_service.dart';
-import 'screens/onboarding_screen.dart';
+import 'services/app_update_service.dart';
 import 'app.dart';
 
 void main() async {
@@ -92,6 +91,9 @@ void _initializeInBackground() {
       // Schedule daily reminder
       await NudgeService().scheduleDailyReminder();
       
+      // Check for app updates (flexible update)
+      await AppUpdateService().checkForUpdate();
+      
       // Show app open ad AFTER everything is initialized (once per session, for free users)
       await _showAppOpenAdIfNeeded();
       
@@ -146,8 +148,8 @@ Future<void> _syncSubscriptionFromFirebase() async {
     final subscription = SubscriptionService();
     
     if (auth.isSignedIn) {
+      // Only sync from Firebase - it's the source of truth
       await subscription.syncFromFirebase();
-    } else {
     }
   } catch (e) {
     // Continue even if sync fails - use local data
